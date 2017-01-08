@@ -14,7 +14,8 @@ S = 's'
 GRAY = 'grey'
 SOBEL_X = 'sobel_x'     # Thresholded by sobel in X direction
 S_THRESH = 's_thresh'   # Thresholded by S channel
-COMBINED_BINARY = 'combined_binary' # Combined thresholded images
+COMBINED_BINARY = 'combined_binary'  # Combined thresholded images
+TOP_DOWN = 'top_down'
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -22,6 +23,10 @@ SOBEL_X_MIN = 'SOBEL_X_MIN'
 SOBEL_X_MAX = 'SOBEL_X_MAX'
 S_MIN = 'S_MIN'
 S_MAX = 'S_MAX'
+FAR_LEFT = 'FAR_LEFT'
+FAR_RIGHT = 'FAR_RIGHT'
+NEAR_LEFT = 'NEAR_LEFT'
+NEAR_RIGHT = 'NEAR_RIGHT'
 
 
 # Definition of a pipeline parameter
@@ -36,11 +41,16 @@ class ParamDef(object):
 
 # Definition of all parameters in our pipeline
 param_defs = {
-    SOBEL_X_KERNEL_SIZE: ParamDef(3,15,2, "Sobel X kernel size"),
+    SOBEL_X_KERNEL_SIZE: ParamDef(3, 15, 2, "Sobel X kernel size"),
     SOBEL_X_MIN: ParamDef(0, 255, 1, "Sobel min threshold"),
     SOBEL_X_MAX: ParamDef(0, 255, 1, "Sobel max threshold"),
     S_MIN: ParamDef(0, 255, 1, "S min threshold"),
     S_MAX: ParamDef(0, 255, 1, "S max threshold"),
+    # Source box for warping
+    FAR_LEFT: ParamDef(0, 1, 0.001, "Far left %"),
+    FAR_RIGHT: ParamDef(0, 1, 0.001, "Far right %"),
+    NEAR_LEFT: ParamDef(0, 1, 0.001, "Near left %"),
+    NEAR_RIGHT: ParamDef(0, 1, 0.001, "Near right %"),
 }
 # Parameters to use for various steps of the pipeline
 params = {
@@ -48,7 +58,11 @@ params = {
     SOBEL_X_MIN: 30,
     SOBEL_X_MAX: 100,
     S_MIN: 170,
-    S_MAX: 255
+    S_MAX: 255,
+    FAR_LEFT: 0.359,
+    FAR_RIGHT: 0.655,
+    NEAR_LEFT: 0.137,
+    NEAR_RIGHT: 0.876,
 }
 
 
@@ -125,6 +139,42 @@ def combined_binary(imgs_dict):
     return combined
 
 
+def perspective_projection(img):
+    w = img.shape[1]
+    h = img.shape[0]
+    src = get_perspective_src(img)
+
+    # Define 4 corners for top-down view
+    top_down_left = w * 0.25
+    top_down_right = w * 0.75
+    dst = np.float32([[top_down_left, h*0.75],
+                      [top_down_right, h*0.75],
+                      [top_down_left, h],
+                      [top_down_right, h]])
+    # get the transform matrix
+    matrix = cv2.getPerspectiveTransform(np.float32(src), dst)
+    # Warp to a top-down view
+    return cv2.warpPerspective(img, matrix, img.shape[::-1])
+
+
+def get_perspective_src(img):
+    """
+    Returns the source coordinates for a perspective warp
+    :param img: image
+    :return: source coordinates
+    """
+    # Return (bottom, far left, far right
+    width = img.shape[1]
+    height = img.shape[0]
+    far_left = int(width * params[FAR_LEFT])
+    far_right = int(width * params[FAR_RIGHT])
+    top = int(height * 0.744) # somewhat arbitrary top where other params were tuned
+    near_left = int(width * params[NEAR_LEFT])
+    near_right = int(width * params[NEAR_RIGHT])
+    bottom = height - 1
+    return [(far_left, top), (far_right, top), (near_left, bottom), (nr, bottom)]
+
+
 def process_image(original):
     """
     Perform lane finding on an image
@@ -133,11 +183,12 @@ def process_image(original):
     """
     result = {UNDISTORTED: undistort_image(original)}
     result[HLS] = convert_to_hls(result[UNDISTORTED])
-    result[S] = result[HLS][:,:,2]
+    result[S] = result[HLS][:, :, 2]
     result[GRAY] = convert_to_gray(result[UNDISTORTED])
     result[SOBEL_X] = thresholded_sobel_x(result[GRAY])
     result[S_THRESH] = threshold_image(result[S], params[S_MIN], params[S_MAX])
     result[COMBINED_BINARY] = combined_binary(result)
+    result[TOP_DOWN] = perspective_projection(result[COMBINED_BINARY])
     return result
 
 
@@ -213,10 +264,10 @@ def request_reprocess():
     output = None
 
 
-def update_param(key, trackbar_value):
-    param_def = param_defs[key]
+def update_param(param_key, trackbar_value):
+    param_def = param_defs[param_key]
     # Convert from trackbar value (min 0, integer step) to actual value
-    params[key] = trackbar_value * param_def.step + param_def.min_value
+    params[param_key] = trackbar_value * param_def.step + param_def.min_value
     request_reprocess()
 
 
@@ -236,9 +287,25 @@ def actual_to_trackbar_value(param_def, value):
     return int((value - param_def.min_value) / param_def.step)
 
 
+def add_warp_src_indicators(img):
+    # Add indicators showing the warping source coordinates
+    src = get_perspective_src(img)
+    img = cv2.line(img, src[0], src[1], 255, 4)
+    img = cv2.line(img, src[0], src[2], 255, 4)
+    img = cv2.line(img, src[2], src[3], 255, 4)
+    img = cv2.line(img, src[1], src[3], 255, 4)
+    return img
+
+
 if __name__ == "__main__":
     # determine camera calibration parameters
     camera_matrix, distortion_coeffs = calibrate_camera()
+
+    for i, filename in enumerate(glob.glob('camera_cal/*.jpg')):
+        iii = cv2.imread(filename)
+        undist = undistort_image(iii)
+        cv2.imwrite('cam_undist/undist' + str(i) + '.jpg', undist)
+
 
     # read images and prepare to cycle through them
     images = read_images()
@@ -255,9 +322,11 @@ if __name__ == "__main__":
             # display_image("Undistorted", output[UNDISTORTED])
             # display_image("HLS", output[HLS])
             # display_image("S", output[HLS])
-            display_image(SOBEL_X, output[SOBEL_X], SOBEL_X_KERNEL_SIZE, SOBEL_X_MIN, SOBEL_X_MAX)
-            display_image(S_THRESH, output[S_THRESH], S_MIN, S_MAX)
-            display_image(COMBINED_BINARY, output[COMBINED_BINARY])
+            # display_image(SOBEL_X, output[SOBEL_X], SOBEL_X_KERNEL_SIZE, SOBEL_X_MIN, SOBEL_X_MAX)
+            # display_image(S_THRESH, output[S_THRESH], S_MIN, S_MAX)
+            combined_with_warp_src = add_warp_src_indicators(output[COMBINED_BINARY]);
+            display_image(COMBINED_BINARY, output[COMBINED_BINARY], FAR_LEFT, FAR_RIGHT, NEAR_LEFT, NEAR_RIGHT)
+            display_image(TOP_DOWN, output[TOP_DOWN])
 
         key = cv2.waitKey(33)
         if key == ord('q'):

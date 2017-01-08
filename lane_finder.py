@@ -172,7 +172,7 @@ def get_perspective_src(img):
     near_left = int(width * params[NEAR_LEFT])
     near_right = int(width * params[NEAR_RIGHT])
     bottom = height - 1
-    return [(far_left, top), (far_right, top), (near_left, bottom), (nr, bottom)]
+    return [(far_left, top), (far_right, top), (near_left, bottom), (near_right, bottom)]
 
 
 def process_image(original):

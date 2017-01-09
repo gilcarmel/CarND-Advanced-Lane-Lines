@@ -7,15 +7,17 @@ import itertools
 import numpy as np
 import cv2
 
+import os.path
+
 # Keys into intermidiate image dictionary
-UNDISTORTED = 'undistorted'
-HLS = 'hls'
-S = 's'
-GRAY = 'grey'
-SOBEL_X = 'sobel_x'     # Thresholded by sobel in X direction
-S_THRESH = 's_thresh'   # Thresholded by S channel
-COMBINED_BINARY = 'combined_binary'  # Combined thresholded images
-TOP_DOWN = 'top_down'
+UNDISTORTED = '0_undistorted'
+HLS = '1_hls'
+S = '2_s'
+S_THRESH = '3_s_thresh'   # Thresholded by S channel
+GRAY = '4_grey'
+SOBEL_X = '5_sobel_x'     # Thresholded by sobel in X direction
+COMBINED_BINARY = '6_combined_binary'  # Combined thresholded images
+TOP_DOWN = '7_top_down'
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -69,13 +71,14 @@ params = {
 def read_images():
     """
     Read sample images under test_images
-    :return: list of images
+    :return: list of (filename, image) pairs
     """
-    result = []
-    for fname in glob.glob("test_images/*.jpg"):
-        result.append(cv2.imread(fname))
-    print("Read {} images.".format(len(result)))
-    return result
+    images = []
+    fnames = glob.glob("test_images/*.jpg")
+    for fname in fnames:
+        images.append(cv2.imread(fname))
+    print("Read {} images.".format(len(images)))
+    return zip(fnames,images)
 
 
 def undistort_image(img):
@@ -297,27 +300,32 @@ def add_warp_src_indicators(img):
     return img
 
 
+def write_output(orig_filename, orig, output_images):
+    dirname, basename  = os.path.split(orig_filename)
+    out_path = os.path.join('intermediate', dirname, basename.replace(".jpg",""))
+    if not os.path.exists(out_path):
+        os.makedirs(out_path)
+    cv2.imwrite('{}/00_orig.jpg'.format(out_path), orig)
+    for output_key in output_images:
+        cv2.imwrite('{}/{}.jpg'.format(out_path, output_key), output_images[output_key])
+
+
 if __name__ == "__main__":
     # determine camera calibration parameters
     camera_matrix, distortion_coeffs = calibrate_camera()
-
-    for i, filename in enumerate(glob.glob('camera_cal/*.jpg')):
-        iii = cv2.imread(filename)
-        undist = undistort_image(iii)
-        cv2.imwrite('cam_undist/undist' + str(i) + '.jpg', undist)
-
 
     # read images and prepare to cycle through them
     images = read_images()
     image_cycle = itertools.cycle(images)
 
-    image = next(image_cycle)
+    filename, image = next(image_cycle)
     output = None
 
     # Main loop
     while True:
         if not output:
             output = process_image(image)
+            write_output(filename, image, output)
             display_image("Original", image)
             # display_image("Undistorted", output[UNDISTORTED])
             # display_image("HLS", output[HLS])
@@ -334,5 +342,5 @@ if __name__ == "__main__":
             break
         elif key == ord('n'):
             # next image
-            image = next(image_cycle)
+            filename, image = next(image_cycle)
             output = None

@@ -1,23 +1,29 @@
+import cv2
+import numpy as np
+
+import os.path
+import glob
+import itertools
+
+import matplotlib
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
+matplotlib.use('agg')
+
 
 """Advanced lane finding project. """
 
-import glob
-
-import itertools
-import numpy as np
-import cv2
-
-import os.path
 
 # Keys into intermidiate image dictionary
 UNDISTORTED = '0_undistorted'
 HLS = '1_hls'
 S = '2_s'
-S_THRESH = '3_s_thresh'   # Thresholded by S channel
+S_THRESH = '3_s_thresh'                  # Thresholded by S channel
 GRAY = '4_grey'
-SOBEL_X = '5_sobel_x'     # Thresholded by sobel in X direction
-COMBINED_BINARY = '6_combined_binary'  # Combined thresholded images
-TOP_DOWN = '7_top_down'
+SOBEL_X = '5_sobel_x'                    # Thresholded by sobel in X direction
+COMBINED_BINARY = '6_combined_binary'    # Combined thresholded images
+TOP_DOWN = '7_top_down'                  # top down view
+BOTTOM_HALF_HIST = '8_bottom_half_hist'  # histogram of bottom half of the image
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -73,12 +79,12 @@ def read_images():
     Read sample images under test_images
     :return: list of (filename, image) pairs
     """
-    images = []
+    imgs = []
     fnames = glob.glob("test_images/*.jpg")
     for fname in fnames:
-        images.append(cv2.imread(fname))
-    print("Read {} images.".format(len(images)))
-    return zip(fnames,images)
+        imgs.append(cv2.imread(fname))
+    print("Read {} images.".format(len(imgs)))
+    return zip(fnames, imgs)
 
 
 def undistort_image(img):
@@ -171,11 +177,30 @@ def get_perspective_src(img):
     height = img.shape[0]
     far_left = int(width * params[FAR_LEFT])
     far_right = int(width * params[FAR_RIGHT])
-    top = int(height * 0.744) # somewhat arbitrary top where other params were tuned
+    top = int(height * 0.744)  # somewhat arbitrary top where other params were tuned
     near_left = int(width * params[NEAR_LEFT])
     near_right = int(width * params[NEAR_RIGHT])
     bottom = height - 1
     return [(far_left, top), (far_right, top), (near_left, bottom), (near_right, bottom)]
+
+
+def get_bottom_half_hist(img):
+    """
+    Plot the pixel histogram for the bottom half of the image
+    :param img: thresholded, top-down view
+    :return: histogram plot
+    """
+    histogram = np.sum(img[img.shape[0] / 2:, :], axis=0)
+    fig = Figure()
+    canvas = FigureCanvas(fig)
+    plot = fig.add_subplot(111)
+    plot.plot(histogram)
+    canvas.draw()
+
+    # Convert the plot to an image (i.e. numpy array)
+    data = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
+    data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+    return data
 
 
 def process_image(original):
@@ -192,6 +217,7 @@ def process_image(original):
     result[S_THRESH] = threshold_image(result[S], params[S_MIN], params[S_MAX])
     result[COMBINED_BINARY] = combined_binary(result)
     result[TOP_DOWN] = perspective_projection(result[COMBINED_BINARY])
+    result[BOTTOM_HALF_HIST] = get_bottom_half_hist(result[TOP_DOWN])
     return result
 
 
@@ -206,8 +232,8 @@ def calibrate_camera():
     img_points = []  # 2d points in image plane.
     gray = None
 
-    for filename in glob.glob('camera_cal/*.jpg'):
-        img = cv2.imread(filename)
+    for fname in glob.glob('camera_cal/*.jpg'):
+        img = cv2.imread(fname)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
         # Find the corners in every image.
@@ -301,8 +327,8 @@ def add_warp_src_indicators(img):
 
 
 def write_output(orig_filename, orig, output_images):
-    dirname, basename  = os.path.split(orig_filename)
-    out_path = os.path.join('intermediate', dirname, basename.replace(".jpg",""))
+    dirname, basename = os.path.split(orig_filename)
+    out_path = os.path.join('intermediate', dirname, basename.replace(".jpg", ""))
     if not os.path.exists(out_path):
         os.makedirs(out_path)
     cv2.imwrite('{}/00_orig.jpg'.format(out_path), orig)
@@ -332,9 +358,10 @@ if __name__ == "__main__":
             # display_image("S", output[HLS])
             # display_image(SOBEL_X, output[SOBEL_X], SOBEL_X_KERNEL_SIZE, SOBEL_X_MIN, SOBEL_X_MAX)
             # display_image(S_THRESH, output[S_THRESH], S_MIN, S_MAX)
-            combined_with_warp_src = add_warp_src_indicators(output[COMBINED_BINARY]);
+            combined_with_warp_src = add_warp_src_indicators(output[COMBINED_BINARY])
             display_image(COMBINED_BINARY, output[COMBINED_BINARY], FAR_LEFT, FAR_RIGHT, NEAR_LEFT, NEAR_RIGHT)
             display_image(TOP_DOWN, output[TOP_DOWN])
+            display_image(BOTTOM_HALF_HIST, output[BOTTOM_HALF_HIST])
 
         key = cv2.waitKey(33)
         if key == ord('q'):

@@ -1,29 +1,25 @@
-import cv2
-import numpy as np
-
-import os.path
-import glob
-import itertools
-
-import matplotlib
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.figure import Figure
-matplotlib.use('agg')
-
-
 """Advanced lane finding project. """
 
+import glob
+import itertools
+import os.path
+
+import cv2
+import numpy as np
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.figure import Figure
 
 # Keys into intermidiate image dictionary
-UNDISTORTED = '0_undistorted'
-HLS = '1_hls'
-S = '2_s'
-S_THRESH = '3_s_thresh'                  # Thresholded by S channel
-GRAY = '4_grey'
-SOBEL_X = '5_sobel_x'                    # Thresholded by sobel in X direction
-COMBINED_BINARY = '6_combined_binary'    # Combined thresholded images
-TOP_DOWN = '7_top_down'                  # top down view
-BOTTOM_HALF_HIST = '8_bottom_half_hist'  # histogram of bottom half of the image
+UNDISTORTED = '00_undistorted'
+HLS = '01_hls'
+S = '02_s'
+S_THRESH = '03_s_thresh'  # Thresholded by S channel
+GRAY = '04_grey'
+SOBEL_X = '05_sobel_x'  # Thresholded by sobel in X direction
+COMBINED_BINARY = '06_combined_binary'  # Combined thresholded images
+TOP_DOWN = '07_top_down'  # top down view
+BOTTOM_HALF_HIST = '08_bottom_half_hist'  # histogram of bottom half of the image
+LANE_LINE_POINTS = '09_lane_line_points'
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -114,8 +110,8 @@ def thresholded_sobel_x(gray):
     sobelx = cv2.Sobel(gray, cv2.CV_64F, 1, 0, ksize=params[SOBEL_X_KERNEL_SIZE])
     abssx = np.absolute(sobelx)  # Absolute to accept light->dark and dark->light
     # Normalize and convert to 8 bit
-    scale_factor = np.max(abssx)/255
-    scaled_sobel = (abssx/scale_factor).astype(np.uint8)
+    scale_factor = np.max(abssx) / 255
+    scaled_sobel = (abssx / scale_factor).astype(np.uint8)
     # Threshold
     thresh_min = params[SOBEL_X_MIN]
     thresh_max = params[SOBEL_X_MAX]
@@ -156,8 +152,8 @@ def perspective_projection(img):
     # Define 4 corners for top-down view
     top_down_left = w * 0.25
     top_down_right = w * 0.75
-    dst = np.float32([[top_down_left, h*0.75],
-                      [top_down_right, h*0.75],
+    dst = np.float32([[top_down_left, h * 0.75],
+                      [top_down_right, h * 0.75],
                       [top_down_left, h],
                       [top_down_right, h]])
     # get the transform matrix
@@ -184,23 +180,105 @@ def get_perspective_src(img):
     return [(far_left, top), (far_right, top), (near_left, bottom), (near_right, bottom)]
 
 
-def get_bottom_half_hist(img):
+def find_lane_lines_in_bands(img, histogram):
     """
-    Plot the pixel histogram for the bottom half of the image
+    Find points on the left and right lane lines by searching
+    stacked vertical bands.
+
     :param img: thresholded, top-down view
-    :return: histogram plot
+    :param histogram: histogram of full image along x-axis
+    :return: (lefts, rights). lefts and rights are a list of (x,y) tuples
+     representing points on that lane line.
     """
-    histogram = np.sum(img[img.shape[0] / 2:, :], axis=0)
+    half_width = int(img.shape[1] / 2)
+    left_peak = np.argmax(histogram[:half_width])
+    right_peak = half_width + np.argmax(histogram[half_width:])
+    num_bands = 10
+    search_window_half_width_ratio = 0.05
+    lefts = search_climbing_bands(img, left_peak, num_bands, search_window_half_width_ratio)
+    rights = search_climbing_bands(img, right_peak, num_bands, search_window_half_width_ratio)
+    return lefts, rights
+
+
+def plot_histogram_to_array(histogram):
+    """
+    Plots a histogram to an in-memory image
+    :param histogram: histogram to plot
+    :return: numpy array representing an image
+    """
     fig = Figure()
     canvas = FigureCanvas(fig)
     plot = fig.add_subplot(111)
     plot.plot(histogram)
     canvas.draw()
-
     # Convert the plot to an image (i.e. numpy array)
     data = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     return data
+
+
+def search_climbing_bands(img, start_x, num_bands, search_window_half_width_ratio):
+    """
+    Divide the image into vertical bands and predict the lane position in each band
+    :param img: input image (thresholded top-down view of lane lines)
+    :param start_x: x coordinate to start search in lowest band
+    :param num_bands: number of bands
+    :param search_window_half_width_ratio: width of the search area
+      (as a ratio of img width)
+    :return:  list of (x,y) tuples representing the lane-line prediction for
+      each band
+    """
+    height = int(img.shape[0])
+    width = int(img.shape[1])
+    band_height = int(float(height) / num_bands)
+    cur_bottom = height - 1
+    peaks = []
+    search_window_half_width = int(search_window_half_width_ratio * width)
+    for _ in np.arange(0, num_bands):
+        # Generate a histogram for a small window centered
+        # on the lane detected for the previous band
+        search_left_start = max(0, start_x - search_window_half_width)
+        search_left_end = min(width - 1, start_x + search_window_half_width)
+        search_window = img[
+                        cur_bottom - band_height: cur_bottom,
+                        search_left_start:search_left_end
+                        ]
+        histogram = np.sum(search_window, axis=0)
+        max_index = np.argmax(histogram)
+        # Only update the detection if the maximum is a non-zero value
+        if histogram[max_index] > 0:
+            start_x = max_index + search_left_start
+            peaks.append((start_x, cur_bottom - int(band_height / 2)))
+        cur_bottom = max(0, cur_bottom - band_height)
+    return peaks
+
+
+def find_histogram(img):
+    """
+    Calculate the histogram of pixel values along th x-axis
+    (i.e. the sum of pixel values for each column of the image)
+    :param img: input image
+    :return: histogram
+    """
+    half_height = int(img.shape[0] / 2)
+    return np.sum(img[half_height:, :], axis=0)
+
+
+def draw_lane_line_points(img, lefts, rights):
+    """
+    Return an image with circles representing points in
+    the detected left/right lane lines
+    :param img: input image
+    :param lefts: left lane line point tuples
+    :param rights: right lane line point tuples
+    :return: img with circles super-imposed
+    """
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    for left in lefts:
+        cv2.circle(img, left, 5, (255, 0, 0), -1)
+    for right in rights:
+        cv2.circle(img, right, 5, (0, 0, 255), -1)
+    return img
 
 
 def process_image(original):
@@ -217,7 +295,10 @@ def process_image(original):
     result[S_THRESH] = threshold_image(result[S], params[S_MIN], params[S_MAX])
     result[COMBINED_BINARY] = combined_binary(result)
     result[TOP_DOWN] = perspective_projection(result[COMBINED_BINARY])
-    result[BOTTOM_HALF_HIST] = get_bottom_half_hist(result[TOP_DOWN])
+    histogram = find_histogram(result[TOP_DOWN])
+    result[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
+    lefts, rights = find_lane_lines_in_bands(result[TOP_DOWN], histogram)
+    result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], lefts, rights)
     return result
 
 
@@ -362,6 +443,7 @@ if __name__ == "__main__":
             display_image(COMBINED_BINARY, output[COMBINED_BINARY], FAR_LEFT, FAR_RIGHT, NEAR_LEFT, NEAR_RIGHT)
             display_image(TOP_DOWN, output[TOP_DOWN])
             display_image(BOTTOM_HALF_HIST, output[BOTTOM_HALF_HIST])
+            display_image(LANE_LINE_POINTS, output[LANE_LINE_POINTS])
 
         key = cv2.waitKey(33)
         if key == ord('q'):

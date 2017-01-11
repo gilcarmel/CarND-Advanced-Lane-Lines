@@ -20,6 +20,7 @@ COMBINED_BINARY = '06_combined_binary'  # Combined thresholded images
 TOP_DOWN = '07_top_down'  # top down view
 BOTTOM_HALF_HIST = '08_bottom_half_hist'  # histogram of bottom half of the image
 LANE_LINE_POINTS = '09_lane_line_points'
+LANE_LINE_POLYS = '10_lane_line_polynomials'
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -187,8 +188,8 @@ def find_lane_lines_in_bands(img, histogram):
 
     :param img: thresholded, top-down view
     :param histogram: histogram of full image along x-axis
-    :return: (lefts, rights). lefts and rights are a list of (x,y) tuples
-     representing points on that lane line.
+    :return: (lefts, rights). lefts and rights are np.arrays of
+      points on each lane line.
     """
     half_width = int(img.shape[1] / 2)
     left_peak = np.argmax(histogram[:half_width])
@@ -197,7 +198,7 @@ def find_lane_lines_in_bands(img, histogram):
     search_window_half_width_ratio = 0.05
     lefts = search_climbing_bands(img, left_peak, num_bands, search_window_half_width_ratio)
     rights = search_climbing_bands(img, right_peak, num_bands, search_window_half_width_ratio)
-    return lefts, rights
+    return np.array(lefts), np.array(rights)
 
 
 def plot_histogram_to_array(histogram):
@@ -207,11 +208,15 @@ def plot_histogram_to_array(histogram):
     :return: numpy array representing an image
     """
     fig = Figure()
-    canvas = FigureCanvas(fig)
     plot = fig.add_subplot(111)
     plot.plot(histogram)
-    canvas.draw()
     # Convert the plot to an image (i.e. numpy array)
+    return write_figure_to_array(fig)
+
+
+def write_figure_to_array(fig):
+    canvas = FigureCanvas(fig)
+    canvas.draw()
     data = np.fromstring(canvas.tostring_rgb(), dtype='uint8')
     data = data.reshape(fig.canvas.get_width_height()[::-1] + (3,))
     return data
@@ -275,10 +280,61 @@ def draw_lane_line_points(img, lefts, rights):
     """
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     for left in lefts:
-        cv2.circle(img, left, 5, (255, 0, 0), -1)
+        cv2.circle(img, (left[0], left[1]), 5, (255, 0, 0), -1)
     for right in rights:
-        cv2.circle(img, right, 5, (0, 0, 255), -1)
+        cv2.circle(img, (right[0], right[1]), 5, (0, 0, 255), -1)
     return img
+
+
+def fit_polynomials(lefts, rights):
+    """
+    Returns a second-order polynomial fitting a points on the left
+      and right lane lines
+    :param lefts: points on the left lane line
+    :param rights: points on the right lane line
+    :return: (left_poly, right_poly) - second order polynomial coefficients
+    """
+    return fit_poly(lefts), fit_poly(rights)
+
+
+def fit_poly(points):
+    """
+    Returns a second degree polynomial fitting the points such that f(y) = x
+    :param points: points
+    :return: polynomial coefficients
+    """
+    yvals = points[:, 1]
+    xvals = points[:, 0]
+    # Fit a second order polynomial to each fake lane line
+    left_fit = np.polyfit(yvals, xvals, 2)
+    return left_fit
+
+
+def draw_lane_line_polynomials(img, left_poly, right_poly):
+    """
+    Draw polynomials on an image
+    :param img: image
+    :param left_poly: left lane line polynomial
+    :param right_poly: right lane line polynomial
+    :return: new image with polynomials drawn on it
+    """
+    img = np.copy(img)
+    draw_polyline(img, left_poly)
+    draw_polyline(img, right_poly)
+    return img
+
+
+def draw_polyline(img, poly):
+    """
+    Draw a polynomial on the image passed in
+    :param img: image
+    :param poly: polynomial coefficients
+    :return: None
+    """
+    yvals = np.linspace(0, img.shape[0] - 1, num=100)
+    xvals = poly[0] * yvals ** 2 + poly[1] * yvals + poly[2]
+    points = np.int32([xvals, yvals]).T
+    cv2.polylines(img, [points], False, (0, 255, 0), 3)
 
 
 def process_image(original):
@@ -299,6 +355,11 @@ def process_image(original):
     result[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
     lefts, rights = find_lane_lines_in_bands(result[TOP_DOWN], histogram)
     result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], lefts, rights)
+    l_poly, r_poly = fit_polynomials(lefts,rights)
+    result[LANE_LINE_POLYS] = draw_lane_line_polynomials(
+        result[LANE_LINE_POINTS],
+        l_poly,
+        r_poly)
     return result
 
 
@@ -444,6 +505,7 @@ if __name__ == "__main__":
             display_image(TOP_DOWN, output[TOP_DOWN])
             display_image(BOTTOM_HALF_HIST, output[BOTTOM_HALF_HIST])
             display_image(LANE_LINE_POINTS, output[LANE_LINE_POINTS])
+            display_image(LANE_LINE_POLYS, output[LANE_LINE_POLYS])
 
         key = cv2.waitKey(33)
         if key == ord('q'):

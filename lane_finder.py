@@ -337,6 +337,56 @@ def draw_polyline(img, poly):
     cv2.polylines(img, [points], False, (0, 255, 0), 3)
 
 
+def calculate_curvature(img, lefts, rights):
+    """
+    Calculate curvature radius for the left and right lane lines
+    at the bottom of the image
+    :param img: image
+    :param lefts: left lane line points (pixel units)
+    :param rights: right lane line points (pixel units)
+    :return: (left_radius, right_radius) in meters.
+    """
+    height = img.shape[0]
+    width = img.shape[1]
+    # TODO: adjust for actual values based on video and perspective warp
+    ym_per_pix = 30 / height  # meters per pixel in y dimension
+    xm_per_pix = 3.7 / width  # meteres per pixel in x dimension
+
+    left_fit_meters = scale_and_fit_poly(lefts, xm_per_pix, ym_per_pix)
+    right_fit_meters = scale_and_fit_poly(rights, xm_per_pix, ym_per_pix)
+
+    # Calculate the curvature radius (in meters) at the bottom of the image
+    y_eval = height * ym_per_pix
+    left_curverad = calculate_curve_radius(left_fit_meters, y_eval)
+    right_curverad = calculate_curve_radius(right_fit_meters, y_eval)
+    return (left_curverad, right_curverad)
+
+
+def calculate_curve_radius(polynomial, value):
+    """
+    Calculate the curvature radius of a polynomial at a particular value
+    :param polynomial: second order polynomial coeffecients
+    :param value: value at which to calculate curve radius
+    :return: curve radius
+    """
+    return ((1 + (2 * polynomial[0] * value + polynomial[1]) ** 2) ** 1.5) \
+            / np.absolute(2 * polynomial[0])
+
+
+def scale_and_fit_poly(points, xm_per_pix, ym_per_pix):
+    """
+    Fit a polygon to the points passed in, after converting from pixels to meters
+    :param points: points in pixels
+    :param xm_per_pix: meters per pixel in x direction
+    :param ym_per_pix: meters per pixel in y direction
+    :return: polynomial coefficients that work for meters
+    """
+    points = np.float64(points)
+    points[:, 0] *= xm_per_pix
+    points[:, 1] *= ym_per_pix
+    return fit_poly(points)
+
+
 def process_image(original):
     """
     Perform lane finding on an image
@@ -360,6 +410,7 @@ def process_image(original):
         result[LANE_LINE_POINTS],
         l_poly,
         r_poly)
+    curvature_radius = calculate_curvature(result[LANE_LINE_POLYS], lefts, rights)
     return result
 
 

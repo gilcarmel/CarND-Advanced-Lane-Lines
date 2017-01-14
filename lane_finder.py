@@ -21,6 +21,9 @@ TOP_DOWN = '07_top_down'  # top down view
 BOTTOM_HALF_HIST = '08_bottom_half_hist'  # histogram of bottom half of the image
 LANE_LINE_POINTS = '09_lane_line_points'
 LANE_LINE_POLYS = '10_lane_line_polynomials'
+LANE_FILL = '11_lane_fill_region'
+#undistorted front camera with lane-fill overlay
+FRONT_CAM_WITH_LANE_FILL = '12_front_cam_with_lane_fill'
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -145,22 +148,35 @@ def combined_binary(imgs_dict):
     return combined
 
 
-def perspective_projection(img):
+def perspective_projection(img, to_top_down=True):
+    top_down, front_facing = get_perspective_map_regions(img)
+    # get the transform matrix
+    if to_top_down:
+        matrix = cv2.getPerspectiveTransform(front_facing, top_down)
+    else:
+        matrix = cv2.getPerspectiveTransform(top_down, front_facing)
+    # Warp
+    flipped_shape = img.shape[0:2][::-1]
+    return cv2.warpPerspective(img, matrix, flipped_shape)
+
+
+def get_perspective_map_regions(img):
+    """
+    Get the source and dest quadrilaterals defining a perspective projection
+    :param img: image (used for its size)
+    :return: quads on images from top-down cam, front-facing cam
+    """
     w = img.shape[1]
     h = img.shape[0]
-    src = get_perspective_src(img)
-
+    front_facing_quad = np.float32(get_perspective_src(img))
     # Define 4 corners for top-down view
     top_down_left = w * 0.25
     top_down_right = w * 0.75
-    dst = np.float32([[top_down_left, h * 0.75],
+    top_down_quad = np.float32([[top_down_left, h * 0.75],
                       [top_down_right, h * 0.75],
                       [top_down_left, h],
                       [top_down_right, h]])
-    # get the transform matrix
-    matrix = cv2.getPerspectiveTransform(np.float32(src), dst)
-    # Warp to a top-down view
-    return cv2.warpPerspective(img, matrix, img.shape[::-1])
+    return top_down_quad, front_facing_quad
 
 
 def get_perspective_src(img):
@@ -303,38 +319,64 @@ def fit_poly(points):
     :param points: points
     :return: polynomial coefficients
     """
+    if len(points) == 0:
+        return None
     yvals = points[:, 1]
     xvals = points[:, 0]
     # Fit a second order polynomial to each fake lane line
-    left_fit = np.polyfit(yvals, xvals, 2)
-    return left_fit
+    return np.polyfit(yvals, xvals, 2)
 
 
-def draw_lane_line_polynomials(img, left_poly, right_poly):
+def draw_lane_line_polynomials(
+    img,
+    left_poly,
+    min_left_y,
+    right_poly,
+    min_right_y,
+):
     """
     Draw polynomials on an image
     :param img: image
     :param left_poly: left lane line polynomial
+    :param min_left_y: minimum (top) y value for left lane line
     :param right_poly: right lane line polynomial
+    :param min_right_y: minimum (top) y value for right lane line
     :return: new image with polynomials drawn on it
     """
     img = np.copy(img)
-    draw_polyline(img, left_poly)
-    draw_polyline(img, right_poly)
+    max_y = img.shape[0] - 1
+    draw_polyline(img, left_poly, min_left_y, max_y)
+    draw_polyline(img, right_poly, min_right_y, max_y)
     return img
 
 
-def draw_polyline(img, poly):
+def draw_polyline(img, poly, min_y, max_y):
     """
     Draw a polynomial on the image passed in
     :param img: image
     :param poly: polynomial coefficients
+    :param min_y: y value for line start
+    :param max_y: y value for line end
     :return: None
     """
-    yvals = np.linspace(0, img.shape[0] - 1, num=100)
+    if poly is not None:
+        points = get_poly_points(max_y, min_y, poly)
+        cv2.polylines(img, [points], False, (0, 255, 0), 3)
+
+
+def get_poly_points(max_y, min_y, poly):
+    """
+    Returns points along a polynomial
+    (evaluated along 100 points from f(min_y) to f(max_y))
+    :param max_y: maximum y to evaluate
+    :param min_y: minimum y to evaluate
+    :param poly: second order polynomial coefficients
+    :return: points
+    """
+    yvals = np.linspace(min_y, max_y, num=100)
     xvals = poly[0] * yvals ** 2 + poly[1] * yvals + poly[2]
     points = np.int32([xvals, yvals]).T
-    cv2.polylines(img, [points], False, (0, 255, 0), 3)
+    return points
 
 
 def calculate_curvature(img, lefts, rights):
@@ -359,7 +401,7 @@ def calculate_curvature(img, lefts, rights):
     y_eval = height * ym_per_pix
     left_curverad = calculate_curve_radius(left_fit_meters, y_eval)
     right_curverad = calculate_curve_radius(right_fit_meters, y_eval)
-    return (left_curverad, right_curverad)
+    return left_curverad, right_curverad
 
 
 def calculate_curve_radius(polynomial, value):
@@ -369,6 +411,8 @@ def calculate_curve_radius(polynomial, value):
     :param value: value at which to calculate curve radius
     :return: curve radius
     """
+    if polynomial is None:
+        return None
     return ((1 + (2 * polynomial[0] * value + polynomial[1]) ** 2) ** 1.5) \
             / np.absolute(2 * polynomial[0])
 
@@ -381,10 +425,33 @@ def scale_and_fit_poly(points, xm_per_pix, ym_per_pix):
     :param ym_per_pix: meters per pixel in y direction
     :return: polynomial coefficients that work for meters
     """
+    if len(points) == 0:
+        return None
+
     points = np.float64(points)
     points[:, 0] *= xm_per_pix
     points[:, 1] *= ym_per_pix
     return fit_poly(points)
+
+
+def draw_lane_fill_region(img, l_poly, min_left_y, r_poly, min_right_y):
+
+    img = np.zeros_like(img)
+
+    if l_poly is None or r_poly is None:
+        return img
+
+    max_y = img.shape[0] - 1
+    left_points = get_poly_points(max_y, min_left_y, l_poly)
+    right_points = get_poly_points(max_y, min_right_y, r_poly)[::-1]
+    all_points = np.concatenate([left_points, right_points, left_points[:1]])
+    cv2.fillPoly(img, [all_points], [100,255,0])
+    return img
+
+
+def fill_lane_region(img, top_down_lane_fill):
+    front_facing_lane_fill = perspective_projection(top_down_lane_fill, False)
+    return cv2.addWeighted(img, 1., front_facing_lane_fill, 0.5, 0)
 
 
 def process_image(original):
@@ -406,12 +473,31 @@ def process_image(original):
     lefts, rights = find_lane_lines_in_bands(result[TOP_DOWN], histogram)
     result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], lefts, rights)
     l_poly, r_poly = fit_polynomials(lefts,rights)
+    min_left_y, min_right_y = get_min_y_values(lefts, rights)
     result[LANE_LINE_POLYS] = draw_lane_line_polynomials(
         result[LANE_LINE_POINTS],
-        l_poly,
-        r_poly)
+        l_poly, min_left_y,
+        r_poly, min_right_y)
     curvature_radius = calculate_curvature(result[LANE_LINE_POLYS], lefts, rights)
+    result[LANE_FILL] = draw_lane_fill_region(result[LANE_LINE_POLYS], l_poly, min_left_y, r_poly, min_right_y)
+    result[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
+        result[UNDISTORTED],
+        result[LANE_FILL])
     return result
+
+
+def get_min_y_values(lefts, rights):
+    """
+    Get the minimum y values for the points identified. This
+    corresponds to the highest point on the topdown image where
+    we should extend the lane lines to.
+    :param lefts: array of points on the left line
+    :param rights: array of points on the right line
+    :return: (min_left_y, min_right_y). Either can be None if points are empty
+    """
+    min_left_y = np.min(lefts[:, 1]) if len(lefts) > 0 else None
+    min_right_y = np.min(rights[:, 1]) if len(rights) > 0 else None
+    return min_left_y, min_right_y
 
 
 def calibrate_camera():
@@ -529,9 +615,10 @@ def write_output(orig_filename, orig, output_images):
         cv2.imwrite('{}/{}.jpg'.format(out_path, output_key), output_images[output_key])
 
 
+camera_matrix, distortion_coeffs = calibrate_camera()
+
 if __name__ == "__main__":
     # determine camera calibration parameters
-    camera_matrix, distortion_coeffs = calibrate_camera()
 
     # read images and prepare to cycle through them
     images = read_images()
@@ -557,6 +644,8 @@ if __name__ == "__main__":
             display_image(BOTTOM_HALF_HIST, output[BOTTOM_HALF_HIST])
             display_image(LANE_LINE_POINTS, output[LANE_LINE_POINTS])
             display_image(LANE_LINE_POLYS, output[LANE_LINE_POLYS])
+            display_image(LANE_FILL, output[LANE_FILL])
+            display_image(FRONT_CAM_WITH_LANE_FILL, output[FRONT_CAM_WITH_LANE_FILL])
 
         key = cv2.waitKey(33)
         if key == ord('q'):

@@ -1,4 +1,8 @@
-"""Advanced lane finding project. """
+""" This is the main image processing code for finding lanes.
+ process_image() is the main entry point - it executes a CV pipeline to find the left and right lane
+ lines on an image.
+ NOTE: upon being imported this module determines the camera calibration based on the calibration images.
+"""
 
 import glob
 import os.path
@@ -9,6 +13,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 # Keys into intermidiate image dictionary
+from line import Line
+
 UNDISTORTED = '00_undistorted'
 HLS = '01_hls'
 S = '02_s'
@@ -185,24 +191,23 @@ def get_perspective_src(img):
     return [(far_left, top), (far_right, top), (near_left, bottom), (near_right, bottom)]
 
 
-def find_lane_lines_in_bands(img, histogram):
+def find_lane_lines_in_bands(img, histogram, left_line, right_line):
     """
     Find points on the left and right lane lines by searching
     stacked vertical bands.
 
     :param img: thresholded, top-down view
     :param histogram: histogram of full image along x-axis
-    :return: (lefts, rights). lefts and rights are np.arrays of
-      points on each lane line.
+    :param left_line: Upon return, left_line.lane_points will contain detected points
+    :param right_line: Upon return, left_line.lane_points will contain detected points
     """
     half_width = int(img.shape[1] / 2)
     left_peak = np.argmax(histogram[:half_width])
     right_peak = half_width + np.argmax(histogram[half_width:])
     num_bands = 10
     search_window_half_width_ratio = 0.05
-    lefts = search_climbing_bands(img, left_peak, num_bands, search_window_half_width_ratio)
-    rights = search_climbing_bands(img, right_peak, num_bands, search_window_half_width_ratio)
-    return np.array(lefts), np.array(rights)
+    left_line.set_lane_points(search_climbing_bands(img, left_peak, num_bands, search_window_half_width_ratio))
+    right_line.set_lane_points(search_climbing_bands(img, right_peak, num_bands, search_window_half_width_ratio))
 
 
 def plot_histogram_to_array(histogram):
@@ -259,7 +264,7 @@ def search_climbing_bands(img, start_x, num_bands, search_window_half_width_rati
             start_x = max_index + search_left_start
             peaks.append((start_x, cur_bottom - int(band_height / 2)))
         cur_bottom = max(0, cur_bottom - band_height)
-    return peaks
+    return np.array(peaks)
 
 
 def find_histogram(img):
@@ -273,68 +278,39 @@ def find_histogram(img):
     return np.sum(img[half_height:, :], axis=0)
 
 
-def draw_lane_line_points(img, lefts, rights):
+def draw_lane_line_points(img, left_line, right_line):
     """
     Return an image with circles representing points in
     the detected left/right lane lines
     :param img: input image
-    :param lefts: left lane line point tuples
-    :param rights: right lane line point tuples
+    :param left_line: left lane line
+    :param right_line: right lane line
     :return: img with circles super-imposed
     """
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
-    for left in lefts:
+    for left in left_line.lane_points:
         cv2.circle(img, (left[0], left[1]), 5, (255, 0, 0), -1)
-    for right in rights:
+    for right in right_line.lane_points:
         cv2.circle(img, (right[0], right[1]), 5, (0, 0, 255), -1)
     return img
 
 
-def fit_polynomials(lefts, rights):
-    """
-    Returns a second-order polynomial fitting a points on the left
-      and right lane lines
-    :param lefts: points on the left lane line
-    :param rights: points on the right lane line
-    :return: (left_poly, right_poly) - second order polynomial coefficients
-    """
-    return fit_poly(lefts), fit_poly(rights)
-
-
-def fit_poly(points):
-    """
-    Returns a second degree polynomial fitting the points such that f(y) = x
-    :param points: points
-    :return: polynomial coefficients
-    """
-    if len(points) == 0:
-        return None
-    yvals = points[:, 1]
-    xvals = points[:, 0]
-    # Fit a second order polynomial to each fake lane line
-    return np.polyfit(yvals, xvals, 2)
-
-
 def draw_lane_line_polynomials(
     img,
-    left_poly,
-    min_left_y,
-    right_poly,
-    min_right_y,
+    left_line,
+    right_line
 ):
     """
     Draw polynomials on an image
     :param img: image
-    :param left_poly: left lane line polynomial
-    :param min_left_y: minimum (top) y value for left lane line
-    :param right_poly: right lane line polynomial
-    :param min_right_y: minimum (top) y value for right lane line
+    :param left_line: Line object for left lane
+    :param right_line: Line object for right lane
     :return: new image with polynomials drawn on it
     """
     img = np.copy(img)
     max_y = img.shape[0] - 1
-    draw_polyline(img, left_poly, min_left_y, max_y)
-    draw_polyline(img, right_poly, min_right_y, max_y)
+    draw_polyline(img, left_line.polynomial_fit, left_line.min_y, max_y)
+    draw_polyline(img, right_line.polynomial_fit, right_line.min_y, max_y)
     return img
 
 
@@ -362,76 +338,23 @@ def get_poly_points(max_y, min_y, poly):
     :return: points
     """
     yvals = np.linspace(min_y, max_y, num=100)
+    # noinspection PyTypeChecker
     xvals = poly[0] * yvals ** 2 + poly[1] * yvals + poly[2]
+    # noinspection PyUnresolvedReferences
     points = np.int32([xvals, yvals]).T
     return points
 
 
-def calculate_curvature(img, lefts, rights):
-    """
-    Calculate curvature radius for the left and right lane lines
-    at the bottom of the image
-    :param img: image
-    :param lefts: left lane line points (pixel units)
-    :param rights: right lane line points (pixel units)
-    :return: (left_radius, right_radius) in meters.
-    """
-    height = img.shape[0]
-    width = img.shape[1]
-    # TODO: adjust for actual values based on video and perspective warp
-    ym_per_pix = 30 / height  # meters per pixel in y dimension
-    xm_per_pix = 3.7 / width  # meteres per pixel in x dimension
-
-    left_fit_meters = scale_and_fit_poly(lefts, xm_per_pix, ym_per_pix)
-    right_fit_meters = scale_and_fit_poly(rights, xm_per_pix, ym_per_pix)
-
-    # Calculate the curvature radius (in meters) at the bottom of the image
-    y_eval = height * ym_per_pix
-    left_curverad = calculate_curve_radius(left_fit_meters, y_eval)
-    right_curverad = calculate_curve_radius(right_fit_meters, y_eval)
-    return left_curverad, right_curverad
-
-
-def calculate_curve_radius(polynomial, value):
-    """
-    Calculate the curvature radius of a polynomial at a particular value
-    :param polynomial: second order polynomial coeffecients
-    :param value: value at which to calculate curve radius
-    :return: curve radius
-    """
-    if polynomial is None:
-        return None
-    return ((1 + (2 * polynomial[0] * value + polynomial[1]) ** 2) ** 1.5) \
-        / np.absolute(2 * polynomial[0])
-
-
-def scale_and_fit_poly(points, xm_per_pix, ym_per_pix):
-    """
-    Fit a polygon to the points passed in, after converting from pixels to meters
-    :param points: points in pixels
-    :param xm_per_pix: meters per pixel in x direction
-    :param ym_per_pix: meters per pixel in y direction
-    :return: polynomial coefficients that work for meters
-    """
-    if len(points) == 0:
-        return None
-
-    points = np.float64(points)
-    points[:, 0] *= xm_per_pix
-    points[:, 1] *= ym_per_pix
-    return fit_poly(points)
-
-
-def draw_lane_fill_region(img, l_poly, min_left_y, r_poly, min_right_y):
+def draw_lane_fill_region(img, left_line, right_line):
 
     img = np.zeros_like(img)
 
-    if l_poly is None or r_poly is None:
+    if left_line.polynomial_fit is None or right_line.polynomial_fit is None:
         return img
 
     max_y = img.shape[0] - 1
-    left_points = get_poly_points(max_y, min_left_y, l_poly)
-    right_points = get_poly_points(max_y, min_right_y, r_poly)[::-1]
+    left_points = get_poly_points(max_y, left_line.min_y, left_line.polynomial_fit)
+    right_points = get_poly_points(max_y, right_line.min_y, right_line.polynomial_fit)[::-1]
     all_points = np.concatenate([left_points, right_points, left_points[:1]])
     cv2.fillPoly(img, [all_points], [100, 255, 0])
     return img
@@ -446,8 +369,10 @@ def process_image(original):
     """
     Perform lane finding on an image
     :param original: input image
-    :return: Dictionary containing output image and all intermediate images
+    :return: (left line, right line, Dictionary containing output image and all intermediate images)
     """
+    left_line, right_line = create_lane_lines(original)
+
     result = {UNDISTORTED: undistort_image(original)}
     result[HLS] = convert_to_hls(result[UNDISTORTED])
     result[S] = result[HLS][:, :, 2]
@@ -458,20 +383,33 @@ def process_image(original):
     result[TOP_DOWN] = perspective_projection(result[COMBINED_BINARY])
     histogram = find_histogram(result[TOP_DOWN])
     result[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
-    lefts, rights = find_lane_lines_in_bands(result[TOP_DOWN], histogram)
-    result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], lefts, rights)
-    l_poly, r_poly = fit_polynomials(lefts, rights)
-    min_left_y, min_right_y = get_min_y_values(lefts, rights)
+    find_lane_lines_in_bands(result[TOP_DOWN], histogram, left_line, right_line)
+    result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], left_line, right_line)
     result[LANE_LINE_POLYS] = draw_lane_line_polynomials(
         result[LANE_LINE_POINTS],
-        l_poly, min_left_y,
-        r_poly, min_right_y)
-    curvature_radius = calculate_curvature(result[LANE_LINE_POLYS], lefts, rights)
-    result[LANE_FILL] = draw_lane_fill_region(result[LANE_LINE_POLYS], l_poly, min_left_y, r_poly, min_right_y)
+        left_line,
+        right_line)
+    result[LANE_FILL] = draw_lane_fill_region(result[LANE_LINE_POLYS], left_line, right_line)
     result[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
         result[UNDISTORTED],
         result[LANE_FILL])
     return result
+
+
+def create_lane_lines(original):
+    """
+    Initializes two lane line structures
+    :param original: original image
+    :return: (left Line, right Line)
+    """
+    height = original.shape[0]
+    width = original.shape[1]
+    # TODO: adjust for actual values based on video and perspective warp
+    ym_per_pix = 30 / height  # meters per pixel in y dimension
+    xm_per_pix = 3.7 / width  # meteres per pixel in x dimension
+    left_line = Line(xm_per_pix, ym_per_pix, height)
+    right_line = Line(xm_per_pix, ym_per_pix, height)
+    return left_line, right_line
 
 
 def get_min_y_values(lefts, rights):
@@ -551,4 +489,3 @@ def write_output(orig_filename, orig, output_images):
 
 # determine camera calibration parameters
 camera_matrix, distortion_coeffs = calibrate_camera()
-

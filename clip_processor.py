@@ -4,13 +4,11 @@ imageio.plugins.ffmpeg.download()
 
 from moviepy.editor import VideoFileClip
 import lane_finder
-import cv2
-# import numpy as np
+
 
 def generate_output_frame(img):
     result = lane_finder.process_image(img)
     return result[lane_finder.FRONT_CAM_WITH_LANE_FILL]
-    # return np.zeros((128,128,3), np.uint8)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,6 @@
 """Advanced lane finding project. """
 
 import glob
-import itertools
 import os.path
 
 import cv2
@@ -22,7 +21,7 @@ BOTTOM_HALF_HIST = '08_bottom_half_hist'  # histogram of bottom half of the imag
 LANE_LINE_POINTS = '09_lane_line_points'
 LANE_LINE_POLYS = '10_lane_line_polynomials'
 LANE_FILL = '11_lane_fill_region'
-#undistorted front camera with lane-fill overlay
+# undistorted front camera with lane-fill overlay
 FRONT_CAM_WITH_LANE_FILL = '12_front_cam_with_lane_fill'
 
 # KEYS into paramter dictionaries
@@ -60,6 +59,7 @@ param_defs = {
     NEAR_LEFT: ParamDef(0, 1, 0.001, "Near left %"),
     NEAR_RIGHT: ParamDef(0, 1, 0.001, "Near right %"),
 }
+
 # Parameters to use for various steps of the pipeline
 params = {
     SOBEL_X_KERNEL_SIZE: 5,
@@ -72,19 +72,6 @@ params = {
     NEAR_LEFT: 0.137,
     NEAR_RIGHT: 0.876,
 }
-
-
-def read_images():
-    """
-    Read sample images under test_images
-    :return: list of (filename, image) pairs
-    """
-    imgs = []
-    fnames = glob.glob("test_images/*.jpg")
-    for fname in fnames:
-        imgs.append(cv2.imread(fname))
-    print("Read {} images.".format(len(imgs)))
-    return zip(fnames, imgs)
 
 
 def undistort_image(img):
@@ -172,10 +159,11 @@ def get_perspective_map_regions(img):
     # Define 4 corners for top-down view
     top_down_left = w * 0.25
     top_down_right = w * 0.75
-    top_down_quad = np.float32([[top_down_left, h * 0.75],
-                      [top_down_right, h * 0.75],
-                      [top_down_left, h],
-                      [top_down_right, h]])
+    top_down_quad = np.float32(
+      [[top_down_left, h * 0.75],
+       [top_down_right, h * 0.75],
+       [top_down_left, h],
+       [top_down_right, h]])
     return top_down_quad, front_facing_quad
 
 
@@ -414,7 +402,7 @@ def calculate_curve_radius(polynomial, value):
     if polynomial is None:
         return None
     return ((1 + (2 * polynomial[0] * value + polynomial[1]) ** 2) ** 1.5) \
-            / np.absolute(2 * polynomial[0])
+        / np.absolute(2 * polynomial[0])
 
 
 def scale_and_fit_poly(points, xm_per_pix, ym_per_pix):
@@ -445,7 +433,7 @@ def draw_lane_fill_region(img, l_poly, min_left_y, r_poly, min_right_y):
     left_points = get_poly_points(max_y, min_left_y, l_poly)
     right_points = get_poly_points(max_y, min_right_y, r_poly)[::-1]
     all_points = np.concatenate([left_points, right_points, left_points[:1]])
-    cv2.fillPoly(img, [all_points], [100,255,0])
+    cv2.fillPoly(img, [all_points], [100, 255, 0])
     return img
 
 
@@ -472,7 +460,7 @@ def process_image(original):
     result[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
     lefts, rights = find_lane_lines_in_bands(result[TOP_DOWN], histogram)
     result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], lefts, rights)
-    l_poly, r_poly = fit_polynomials(lefts,rights)
+    l_poly, r_poly = fit_polynomials(lefts, rights)
     min_left_y, min_right_y = get_min_y_values(lefts, rights)
     result[LANE_LINE_POLYS] = draw_lane_line_polynomials(
         result[LANE_LINE_POINTS],
@@ -551,60 +539,6 @@ def find_corners(gray, num_columns, num_rows):
     return ret, corners, objp
 
 
-def display_image(window_name, img, *param_keys):
-    """
-    Display an image in a window and create sliders for controlling the image
-    :param window_name: window name
-    :param img: image to display
-    :param param_keys: parameter keys for sliders
-    :return:
-    """
-    cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
-    cv2.imshow(window_name, img)
-
-    # Create a slider for each parameter
-    for param_key in param_keys:
-        create_slider(param_key, window_name)
-
-
-def request_reprocess():
-    global output
-    output = None
-
-
-def update_param(param_key, trackbar_value):
-    param_def = param_defs[param_key]
-    # Convert from trackbar value (min 0, integer step) to actual value
-    params[param_key] = trackbar_value * param_def.step + param_def.min_value
-    request_reprocess()
-
-
-def create_slider(param_key, window_name):
-    param_def = param_defs[param_key]
-    param_value = params[param_key]
-    trackbar_max = actual_to_trackbar_value(param_def, param_def.max_value)
-    cv2.createTrackbar(
-        param_def.description,
-        window_name,
-        actual_to_trackbar_value(param_def, param_value),
-        trackbar_max,
-        lambda param, k=None, state=None: update_param(param_key, param))
-
-
-def actual_to_trackbar_value(param_def, value):
-    return int((value - param_def.min_value) / param_def.step)
-
-
-def add_warp_src_indicators(img):
-    # Add indicators showing the warping source coordinates
-    src = get_perspective_src(img)
-    img = cv2.line(img, src[0], src[1], 255, 4)
-    img = cv2.line(img, src[0], src[2], 255, 4)
-    img = cv2.line(img, src[2], src[3], 255, 4)
-    img = cv2.line(img, src[1], src[3], 255, 4)
-    return img
-
-
 def write_output(orig_filename, orig, output_images):
     dirname, basename = os.path.split(orig_filename)
     out_path = os.path.join('intermediate', dirname, basename.replace(".jpg", ""))
@@ -615,43 +549,6 @@ def write_output(orig_filename, orig, output_images):
         cv2.imwrite('{}/{}.jpg'.format(out_path, output_key), output_images[output_key])
 
 
+# determine camera calibration parameters
 camera_matrix, distortion_coeffs = calibrate_camera()
 
-if __name__ == "__main__":
-    # determine camera calibration parameters
-
-    # read images and prepare to cycle through them
-    images = read_images()
-    image_cycle = itertools.cycle(images)
-
-    filename, image = next(image_cycle)
-    output = None
-
-    # Main loop
-    while True:
-        if not output:
-            output = process_image(image)
-            write_output(filename, image, output)
-            display_image("Original", image)
-            # display_image("Undistorted", output[UNDISTORTED])
-            # display_image("HLS", output[HLS])
-            # display_image("S", output[HLS])
-            # display_image(SOBEL_X, output[SOBEL_X], SOBEL_X_KERNEL_SIZE, SOBEL_X_MIN, SOBEL_X_MAX)
-            # display_image(S_THRESH, output[S_THRESH], S_MIN, S_MAX)
-            combined_with_warp_src = add_warp_src_indicators(output[COMBINED_BINARY])
-            display_image(COMBINED_BINARY, output[COMBINED_BINARY], FAR_LEFT, FAR_RIGHT, NEAR_LEFT, NEAR_RIGHT)
-            display_image(TOP_DOWN, output[TOP_DOWN])
-            display_image(BOTTOM_HALF_HIST, output[BOTTOM_HALF_HIST])
-            display_image(LANE_LINE_POINTS, output[LANE_LINE_POINTS])
-            display_image(LANE_LINE_POLYS, output[LANE_LINE_POLYS])
-            display_image(LANE_FILL, output[LANE_FILL])
-            display_image(FRONT_CAM_WITH_LANE_FILL, output[FRONT_CAM_WITH_LANE_FILL])
-
-        key = cv2.waitKey(33)
-        if key == ord('q'):
-            # quit
-            break
-        elif key == ord('n'):
-            # next image
-            filename, image = next(image_cycle)
-            output = None

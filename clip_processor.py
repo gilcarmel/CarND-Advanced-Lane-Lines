@@ -8,9 +8,7 @@ import cv2
 # import numpy as np
 
 def generate_output_frame(img):
-    #small = cv2.resize(img, (0, 0), fx=0.25, fy=0.25)
-    small = img
-    result = lane_finder.process_image(small)
+    result = lane_finder.process_image(img)
     return result[lane_finder.FRONT_CAM_WITH_LANE_FILL]
     # return np.zeros((128,128,3), np.uint8)
 

@@ -44,6 +44,7 @@ class Line:
             self.polynomial_fit = fit_poly(self.lane_points)
             self.lane_points_m = scale_points(self.lane_points, self.x_meters_per_pixel, self.y_meters_per_pixel)
             self.polynomial_fit_m = fit_poly(self.lane_points_m)
+            self.x = np.polyval(self.polynomial_fit_m, self.min_y * self.y_meters_per_pixel)
             self.calculate_curve_radius()
 
     def calculate_curve_radius(self):

@@ -7,8 +7,9 @@ import lane_finder
 
 
 def generate_output_frame(img):
-    result = lane_finder.process_image(img)
-    return result[lane_finder.FRONT_CAM_WITH_LANE_FILL]
+    left_line, right_line, image_dict, confident = lane_finder.process_image(img)
+
+    return image_dict[lane_finder.FRONT_CAM_WITH_LANE_FILL]
 
 
 if __name__ == "__main__":

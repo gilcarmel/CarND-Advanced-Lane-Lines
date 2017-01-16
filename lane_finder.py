@@ -41,7 +41,6 @@ FAR_RIGHT = 'FAR_RIGHT'
 NEAR_LEFT = 'NEAR_LEFT'
 NEAR_RIGHT = 'NEAR_RIGHT'
 
-
 # Definition of a pipeline parameter
 class ParamDef(object):
     def __init__(self, min_value, max_value, step, description):
@@ -79,6 +78,12 @@ params = {
     NEAR_RIGHT: 0.876,
 }
 
+# maximum allowed difference between second degree coefficients for polynomials to be considered parallel
+POLY_THRESH_2 = 1
+# maximum allowed difference between first degree coefficients for polynomials to be considered parallel
+POLY_THRESH_1 = 200
+# maximum allowed difference between left/right curve radius for high confidence
+CURVE_DIFF_THRESH = 500
 
 def undistort_image(img):
     """
@@ -338,8 +343,7 @@ def get_poly_points(max_y, min_y, poly):
     :return: points
     """
     yvals = np.linspace(min_y, max_y, num=100)
-    # noinspection PyTypeChecker
-    xvals = poly[0] * yvals ** 2 + poly[1] * yvals + poly[2]
+    xvals = np.polyval(poly, yvals)
     # noinspection PyUnresolvedReferences
     points = np.int32([xvals, yvals]).T
     return points
@@ -365,35 +369,86 @@ def fill_lane_region(img, top_down_lane_fill):
     return cv2.addWeighted(img, 1., front_facing_lane_fill, 0.5, 0)
 
 
+def roughly_parallel(left_line, right_line):
+    """
+    Return True if lane lines are roughly parallel
+    :param left_line:
+    :param right_line:
+    :return:
+    """
+    coeff_2_diff = left_line.polynomial_fit_m[0] - right_line.polynomial_fit_m[0]
+    if abs(coeff_2_diff) > POLY_THRESH_2:
+        return False
+    coeff_1_diff = left_line.polynomial_fit_m[1] - right_line.polynomial_fit_m[1]
+    if abs(coeff_1_diff) > POLY_THRESH_1:
+        return False
+    return True
+
+
+def similar_curve_radius(left_line, right_line):
+    """
+    Check with lane lines have a similar curve radisu
+    :param left_line:
+    :param right_line:
+    :return: True if similar, False otherwise
+    """
+    curve_diff = left_line.radius_of_curvature - right_line.radius_of_curvature
+    if abs(curve_diff) > CURVE_DIFF_THRESH:
+        return False
+
+
+def is_confident(left_line, right_line):
+    """
+    Return true if we are confident in this prediction
+    :param left_line: Line object for left lane line
+    :param right_line: Line object for right lane line
+    :return: True if confident, False otherwise
+    """
+    lane_width = right_line.x - left_line.x
+    # US lane width should be 3.7m. Reject anything that is way off
+    if lane_width < 3.2 or lane_width > 4.2:
+        return False
+
+    if not roughly_parallel(left_line, right_line):
+        return False
+
+    if not similar_curve_radius(left_line, right_line):
+        return False
+
+    return True
+
+
+
 def process_image(original):
     """
     Perform lane finding on an image
     :param original: input image
-    :return: (left line, right line, Dictionary containing output image and all intermediate images)
+    :return: (left line, right line, image dictionary for all pipeline steps
     """
     left_line, right_line = create_lane_lines(original)
 
-    result = {UNDISTORTED: undistort_image(original)}
-    result[HLS] = convert_to_hls(result[UNDISTORTED])
-    result[S] = result[HLS][:, :, 2]
-    result[GRAY] = convert_to_gray(result[UNDISTORTED])
-    result[SOBEL_X] = thresholded_sobel_x(result[GRAY])
-    result[S_THRESH] = threshold_image(result[S], params[S_MIN], params[S_MAX])
-    result[COMBINED_BINARY] = combined_binary(result)
-    result[TOP_DOWN] = perspective_projection(result[COMBINED_BINARY])
-    histogram = find_histogram(result[TOP_DOWN])
-    result[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
-    find_lane_lines_in_bands(result[TOP_DOWN], histogram, left_line, right_line)
-    result[LANE_LINE_POINTS] = draw_lane_line_points(result[TOP_DOWN], left_line, right_line)
-    result[LANE_LINE_POLYS] = draw_lane_line_polynomials(
-        result[LANE_LINE_POINTS],
+    image_dict = {UNDISTORTED: undistort_image(original)}
+    image_dict[HLS] = convert_to_hls(image_dict[UNDISTORTED])
+    image_dict[S] = image_dict[HLS][:, :, 2]
+    image_dict[GRAY] = convert_to_gray(image_dict[UNDISTORTED])
+    image_dict[SOBEL_X] = thresholded_sobel_x(image_dict[GRAY])
+    image_dict[S_THRESH] = threshold_image(image_dict[S], params[S_MIN], params[S_MAX])
+    image_dict[COMBINED_BINARY] = combined_binary(image_dict)
+    image_dict[TOP_DOWN] = perspective_projection(image_dict[COMBINED_BINARY])
+    histogram = find_histogram(image_dict[TOP_DOWN])
+    image_dict[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
+    find_lane_lines_in_bands(image_dict[TOP_DOWN], histogram, left_line, right_line)
+    image_dict[LANE_LINE_POINTS] = draw_lane_line_points(image_dict[TOP_DOWN], left_line, right_line)
+    image_dict[LANE_LINE_POLYS] = draw_lane_line_polynomials(
+        image_dict[LANE_LINE_POINTS],
         left_line,
         right_line)
-    result[LANE_FILL] = draw_lane_fill_region(result[LANE_LINE_POLYS], left_line, right_line)
-    result[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
-        result[UNDISTORTED],
-        result[LANE_FILL])
-    return result
+    image_dict[LANE_FILL] = draw_lane_fill_region(image_dict[LANE_LINE_POLYS], left_line, right_line)
+    image_dict[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
+        image_dict[UNDISTORTED],
+        image_dict[LANE_FILL])
+    confident = is_confident(left_line, right_line)
+    return left_line, right_line, image_dict, confident
 
 
 def create_lane_lines(original):

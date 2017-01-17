@@ -80,7 +80,7 @@ def scale_points(points, x_scale, y_scale):
     :param y_scale: meters per pixel in y direction
     :return: scaled points array
     """
-    points = np.float64(points)
-    points[:, 0] *= x_scale
-    points[:, 1] *= y_scale
-    return points
+    scaled_points = np.copy(points)
+    scaled_points[:, 0] *= x_scale
+    scaled_points[:, 1] *= y_scale
+    return scaled_points

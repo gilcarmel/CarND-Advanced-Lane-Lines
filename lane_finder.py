@@ -11,6 +11,7 @@ import cv2
 import numpy as np
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+from scipy import ndimage
 
 # Keys into intermidiate image dictionary
 from line import Line
@@ -238,7 +239,7 @@ def write_figure_to_array(fig):
 
 def search_climbing_bands(img, start_x, num_bands, search_window_half_width_ratio):
     """
-    Divide the image into vertical bands and predict the lane position in each band
+    Divide the image into vertical bands and predict the lane line position in each band
     :param img: input image (thresholded top-down view of lane lines)
     :param start_x: x coordinate to start search in lowest band
     :param num_bands: number of bands
@@ -251,25 +252,26 @@ def search_climbing_bands(img, start_x, num_bands, search_window_half_width_rati
     width = int(img.shape[1])
     band_height = int(float(height) / num_bands)
     cur_bottom = height - 1
-    peaks = []
+    points = [] # Points detected
     search_window_half_width = int(search_window_half_width_ratio * width)
     for _ in np.arange(0, num_bands):
-        # Generate a histogram for a small window centered
-        # on the lane detected for the previous band
+        # Create a search window above the previous band and centered horizontally
+        # about the previous detection
         search_left_start = max(0, start_x - search_window_half_width)
         search_left_end = min(width - 1, start_x + search_window_half_width)
         search_window = img[
-                        cur_bottom - band_height: cur_bottom,
+                        max(0,cur_bottom - band_height): cur_bottom,
                         search_left_start:search_left_end
                         ]
-        histogram = np.sum(search_window, axis=0)
-        max_index = np.argmax(histogram)
-        # Only update the detection if the maximum is a non-zero value
-        if histogram[max_index] > 0:
-            start_x = max_index + search_left_start
-            peaks.append((start_x, cur_bottom - int(band_height / 2)))
+        # Find the center of mass within the search window and add it to the line
+        center_of_mass_in_window = ndimage.measurements.center_of_mass(search_window)[::-1]
+        # Empty iamges return nan for center of mass - ignore
+        if not np.math.isnan(center_of_mass_in_window[0] + center_of_mass_in_window[1]):
+            start_x = search_left_start + center_of_mass_in_window[0]
+            center_of_mass_y = cur_bottom - band_height + center_of_mass_in_window[1]
+            points.append([start_x, center_of_mass_y])
         cur_bottom = max(0, cur_bottom - band_height)
-    return np.array(peaks)
+    return np.array(points)
 
 
 def find_histogram(img):
@@ -294,9 +296,9 @@ def draw_lane_line_points(img, left_line, right_line):
     """
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     for left in left_line.lane_points:
-        cv2.circle(img, (left[0], left[1]), 5, (255, 0, 0), -1)
+        cv2.circle(img, (int(left[0]), int(left[1])), 5, (255, 0, 0), -1)
     for right in right_line.lane_points:
-        cv2.circle(img, (right[0], right[1]), 5, (0, 0, 255), -1)
+        cv2.circle(img, (int(right[0]), int(right[1])), 5, (0, 0, 255), -1)
     return img
 
 

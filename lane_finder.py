@@ -261,7 +261,7 @@ def search_climbing_bands(img, start_x, num_bands, search_window_half_width_rati
         search_left_end = min(width - 1, start_x + search_window_half_width)
         search_window = img[
                         max(0,cur_bottom - band_height): cur_bottom,
-                        search_left_start:search_left_end
+                        int(search_left_start):int(search_left_end)
                         ]
         # Find the center of mass within the search window and add it to the line
         center_of_mass_in_window = ndimage.measurements.center_of_mass(search_window)[::-1]

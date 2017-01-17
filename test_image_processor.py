@@ -1,3 +1,4 @@
+import argparse
 import glob
 import itertools
 
@@ -6,13 +7,13 @@ import cv2
 import lane_finder as lf
 
 
-def read_images():
+def read_images(path):
     """
     Read sample images under test_images
     :return: list of (filename, image) pairs
     """
     imgs = []
-    fnames = glob.glob("test_images/*.jpg")
+    fnames = glob.glob("{}/*.jpg".format(path))
     for fname in fnames:
         imgs.append(cv2.imread(fname))
     print("Read {} images.".format(len(imgs)))
@@ -75,8 +76,12 @@ def add_warp_src_indicators(img):
 
 if __name__ == "__main__":
 
+    parser = argparse.ArgumentParser(description='Process some test jpgs in an interactive UI')
+    parser.add_argument("path", help="path containing test image jpgs")
+    args = parser.parse_args()
+
     # read images and prepare to cycle through them
-    images = read_images()
+    images = read_images(args.path)
     image_cycle = itertools.cycle(images)
 
     filename, image = next(image_cycle)

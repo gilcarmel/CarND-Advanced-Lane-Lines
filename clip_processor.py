@@ -12,6 +12,7 @@ def generate_output_frame(img):
     final_image = image_dict[lane_finder.FRONT_CAM_WITH_LANE_FILL]
     if frame_number % 10 == 0:
         lane_finder.write_output("{0}/frame_{1:0>4}".format(basename, frame_number), img, image_dict)
+        final_image = lane_finder.to_bgr_if_necessary(final_image)
         cv2.imwrite('intermediate/{0}/{1:0>4}.jpg'.format(basename, frame_number), final_image)
     frame_number += 1
     return final_image

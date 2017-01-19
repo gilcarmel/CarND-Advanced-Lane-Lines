@@ -15,7 +15,9 @@ def read_images(path):
     imgs = []
     fnames = glob.glob("{}/*.jpg".format(path))
     for fname in fnames:
-        imgs.append(cv2.imread(fname))
+        # Convert to RGB (pipline handles RGB to streamline video processing)
+        rgb_image = cv2.cvtColor(cv2.imread(fname), cv2.COLOR_BGR2RGB)
+        imgs.append(rgb_image)
     print("Read {} images.".format(len(imgs)))
     return zip(fnames, imgs)
 
@@ -53,6 +55,7 @@ def display_image(window_name, img, *param_keys):
     :return:
     """
     cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
+    img = lf.to_bgr_if_necessary(img)
     cv2.imshow(window_name, img)
 
     # Create a slider for each parameter

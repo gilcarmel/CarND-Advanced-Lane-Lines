@@ -86,6 +86,7 @@ POLY_THRESH_1 = 200
 # maximum allowed difference between left/right curve radius for high confidence
 CURVE_DIFF_THRESH = 500
 
+
 def undistort_image(img):
     """
     Undistort an image using the global calibration parameters
@@ -97,11 +98,11 @@ def undistort_image(img):
 
 
 def convert_to_hls(img):
-    return cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
+    return cv2.cvtColor(img, cv2.COLOR_RGB2HLS)
 
 
 def convert_to_gray(img):
-    return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    return cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
 
 
 def thresholded_sobel_x(gray):
@@ -294,7 +295,7 @@ def draw_lane_line_points(img, left_line, right_line):
     :param right_line: right lane line
     :return: img with circles super-imposed
     """
-    img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     for left in left_line.lane_points:
         cv2.circle(img, (int(left[0]), int(left[1])), 5, (255, 0, 0), -1)
     for right in right_line.lane_points:
@@ -539,9 +540,17 @@ def write_output(orig_filename, orig, output_images):
     out_path = os.path.join('intermediate', dirname, basename.replace(".jpg", ""))
     if not os.path.exists(out_path):
         os.makedirs(out_path)
-    cv2.imwrite('{}/00_orig.jpg'.format(out_path), orig)
+    cv2.imwrite('{}/00_orig.jpg'.format(out_path), cv2.cvtColor(orig, cv2.COLOR_RGB2BGR))
     for output_key in output_images:
-        cv2.imwrite('{}/{}.jpg'.format(out_path, output_key), output_images[output_key])
+        intermediate_image = output_images[output_key]
+        intermediate_image = to_bgr_if_necessary(intermediate_image)
+        cv2.imwrite('{}/{}.jpg'.format(out_path, output_key), intermediate_image)
+
+
+def to_bgr_if_necessary(img):
+    if len(img.shape) > 2:
+        img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+    return img
 
 
 # determine camera calibration parameters

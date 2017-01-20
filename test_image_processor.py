@@ -23,8 +23,8 @@ def read_images(path):
 
 
 def request_reprocess():
-    global output
-    output = None
+    global intermediate_images
+    intermediate_images = None
 
 
 def update_param(param_key, trackbar_value):
@@ -89,20 +89,20 @@ if __name__ == "__main__":
     image_cycle = itertools.cycle(images)
 
     filename, image = next(image_cycle)
-    output = None
+    intermediate_images = None
 
     # Main loop
     while True:
-        if not output:
-            _, _, output, _ = lf.process_image(image)
-            lf.write_output(filename, image, output)
+        if not intermediate_images:
+            lane, intermediate_images = lf.process_image(image)
+            lf.write_output(filename, image, intermediate_images)
             display_image("Original", image)
             # display_image("Undistorted", output[UNDISTORTED])
             # display_image("HLS", output[HLS])
             # display_image("S", output[HLS])
             # display_image(SOBEL_X, output[SOBEL_X], SOBEL_X_KERNEL_SIZE, SOBEL_X_MIN, SOBEL_X_MAX)
             # display_image(S_THRESH, output[S_THRESH], S_MIN, S_MAX)
-            combined_with_warp_src = add_warp_src_indicators(output[lf.COMBINED_BINARY])
+            combined_with_warp_src = add_warp_src_indicators(intermediate_images[lf.COMBINED_BINARY])
             display_image(
                 lf.COMBINED_BINARY,
                 combined_with_warp_src,
@@ -110,12 +110,12 @@ if __name__ == "__main__":
                 lf.FAR_RIGHT,
                 lf.NEAR_LEFT,
                 lf.NEAR_RIGHT)
-            display_image(lf.TOP_DOWN, output[lf.TOP_DOWN])
+            display_image(lf.TOP_DOWN, intermediate_images[lf.TOP_DOWN])
             # display_image(lf.BOTTOM_HALF_HIST, output[lf.BOTTOM_HALF_HIST])
             # display_image(lf.LANE_LINE_POINTS, output[lf.LANE_LINE_POINTS])
-            display_image(lf.LANE_LINE_POLYS, output[lf.LANE_LINE_POLYS])
-            display_image(lf.LANE_FILL, output[lf.LANE_FILL])
-            display_image(lf.FRONT_CAM_WITH_LANE_FILL, output[lf.FRONT_CAM_WITH_LANE_FILL])
+            display_image(lf.LANE_LINE_POLYS, intermediate_images[lf.LANE_LINE_POLYS])
+            display_image(lf.LANE_FILL, intermediate_images[lf.LANE_FILL])
+            display_image(lf.FRONT_CAM_WITH_LANE_FILL, intermediate_images[lf.FRONT_CAM_WITH_LANE_FILL])
 
         key = cv2.waitKey(33)
         if key == ord('q'):
@@ -124,4 +124,4 @@ if __name__ == "__main__":
         elif key == ord('n'):
             # next image
             filename, image = next(image_cycle)
-            output = None
+            intermediate_images = None

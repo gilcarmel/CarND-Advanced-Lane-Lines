@@ -14,6 +14,7 @@ from matplotlib.figure import Figure
 from scipy import ndimage
 
 # Keys into intermidiate image dictionary
+from lane import Lane
 from line import Line
 
 UNDISTORTED = '00_undistorted'
@@ -78,13 +79,6 @@ params = {
     NEAR_LEFT: 0.165,
     NEAR_RIGHT: 0.879,
 }
-
-# maximum allowed difference between second degree coefficients for polynomials to be considered parallel
-POLY_THRESH_2 = 1
-# maximum allowed difference between first degree coefficients for polynomials to be considered parallel
-POLY_THRESH_1 = 200
-# maximum allowed difference between left/right curve radius for high confidence
-CURVE_DIFF_THRESH = 500
 
 
 def undistort_image(img):
@@ -372,56 +366,6 @@ def fill_lane_region(img, top_down_lane_fill):
     return cv2.addWeighted(img, 1., front_facing_lane_fill, 0.5, 0)
 
 
-def roughly_parallel(left_line, right_line):
-    """
-    Return True if lane lines are roughly parallel
-    :param left_line:
-    :param right_line:
-    :return:
-    """
-    coeff_2_diff = left_line.polynomial_fit_m[0] - right_line.polynomial_fit_m[0]
-    if abs(coeff_2_diff) > POLY_THRESH_2:
-        return False
-    coeff_1_diff = left_line.polynomial_fit_m[1] - right_line.polynomial_fit_m[1]
-    if abs(coeff_1_diff) > POLY_THRESH_1:
-        return False
-    return True
-
-
-def similar_curve_radius(left_line, right_line):
-    """
-    Check with lane lines have a similar curve radisu
-    :param left_line:
-    :param right_line:
-    :return: True if similar, False otherwise
-    """
-    curve_diff = left_line.radius_of_curvature - right_line.radius_of_curvature
-    if abs(curve_diff) > CURVE_DIFF_THRESH:
-        return False
-
-
-def is_confident(left_line, right_line):
-    """
-    Return true if we are confident in this prediction
-    :param left_line: Line object for left lane line
-    :param right_line: Line object for right lane line
-    :return: True if confident, False otherwise
-    """
-    lane_width = right_line.x - left_line.x
-    # US lane width should be 3.7m. Reject anything that is way off
-    if lane_width < 3.2 or lane_width > 4.2:
-        return False
-
-    if not roughly_parallel(left_line, right_line):
-        return False
-
-    if not similar_curve_radius(left_line, right_line):
-        return False
-
-    return True
-
-
-
 def process_image(original):
     """
     Perform lane finding on an image
@@ -450,8 +394,7 @@ def process_image(original):
     image_dict[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
         image_dict[UNDISTORTED],
         image_dict[LANE_FILL])
-    confident = is_confident(left_line, right_line)
-    return left_line, right_line, image_dict, confident
+    return Lane(left_line, right_line), image_dict
 
 
 def create_lane_lines(original):

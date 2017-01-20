@@ -11,8 +11,6 @@ class Line:
         self.y_meters_per_pixel = y_meters_per_pixel
         # bottom of image in pixels, representing car's current location
         self.bottom_y = bottom_y
-        # Was the line detected
-        self.detected = False
         # x value of the line bottom in pixels
         self.x = None
         # detected points forming the line in pixels
@@ -29,6 +27,8 @@ class Line:
         self.radius_of_curvature = None
         # distance in meters of vehicle center from the line
         self.line_base_pos = None
+        # set to true when lane_points are set.
+        self.is_detected = False
 
     def set_lane_points(self, lane_points):
         """
@@ -46,6 +46,7 @@ class Line:
             self.polynomial_fit_m = fit_poly(self.lane_points_m)
             self.x = np.polyval(self.polynomial_fit_m, self.min_y * self.y_meters_per_pixel)
             self.calculate_curve_radius()
+            self.is_detected = True
 
     def calculate_curve_radius(self):
         """

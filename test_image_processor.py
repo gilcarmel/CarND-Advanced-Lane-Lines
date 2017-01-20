@@ -69,11 +69,12 @@ def actual_to_trackbar_value(param_def, value):
 
 def add_warp_src_indicators(img):
     # Add indicators showing the warping source coordinates
+    img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     src = lf.get_perspective_src(img)
-    img = cv2.line(img, src[0], src[1], 255, 4)
-    img = cv2.line(img, src[0], src[2], 255, 4)
-    img = cv2.line(img, src[2], src[3], 255, 4)
-    img = cv2.line(img, src[1], src[3], 255, 4)
+    img = cv2.line(img, src[0], src[1], (255,0,0), 1)
+    img = cv2.line(img, src[0], src[2], (255,0,0), 1)
+    img = cv2.line(img, src[2], src[3], (255,0,0), 1)
+    img = cv2.line(img, src[1], src[3], (255,0,0), 1)
     return img
 
 
@@ -104,7 +105,7 @@ if __name__ == "__main__":
             combined_with_warp_src = add_warp_src_indicators(output[lf.COMBINED_BINARY])
             display_image(
                 lf.COMBINED_BINARY,
-                output[lf.COMBINED_BINARY],
+                combined_with_warp_src,
                 lf.FAR_LEFT,
                 lf.FAR_RIGHT,
                 lf.NEAR_LEFT,

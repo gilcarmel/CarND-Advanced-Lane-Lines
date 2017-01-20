@@ -73,10 +73,10 @@ params = {
     SOBEL_X_MAX: 100,
     S_MIN: 170,
     S_MAX: 255,
-    FAR_LEFT: 0.359,
-    FAR_RIGHT: 0.655,
-    NEAR_LEFT: 0.137,
-    NEAR_RIGHT: 0.876,
+    FAR_LEFT: 0.374,
+    FAR_RIGHT: 0.647,
+    NEAR_LEFT: 0.165,
+    NEAR_RIGHT: 0.879,
 }
 
 # maximum allowed difference between second degree coefficients for polynomials to be considered parallel
@@ -462,9 +462,9 @@ def create_lane_lines(original):
     """
     height = original.shape[0]
     width = original.shape[1]
-    # TODO: adjust for actual values based on video and perspective warp
-    ym_per_pix = 30 / height  # meters per pixel in y dimension
-    xm_per_pix = 3.7 / width  # meteres per pixel in x dimension
+    # These are derived by dividing known distances by measured pixel distances in the top-down view
+    ym_per_pix = 9.14 / 230  # meters per pixel in y dimension (9.14m is the distance between dashes on a lane line)
+    xm_per_pix = 3.7 / 640  # meteres per pixel in x dimension (3.7m is the width of a lane)
     left_line = Line(xm_per_pix, ym_per_pix, height)
     right_line = Line(xm_per_pix, ym_per_pix, height)
     return left_line, right_line

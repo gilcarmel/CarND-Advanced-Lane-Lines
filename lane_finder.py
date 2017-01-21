@@ -86,14 +86,15 @@ params = {
 }
 
 
-def undistort_image(img):
+def undistort_image(img, cam_matrix, distortion_coefficients):
     """
     Undistort an image using the global calibration parameters
     :param img: input image
+    :param cam_matrix: camera projection matrix
+    :param distortion_coefficients: distortion coefficients
     :return: undistorted image
     """
-    global camera_matrix, distortion_coeffs
-    return cv2.undistort(img, camera_matrix, distortion_coeffs, None, camera_matrix)
+    return cv2.undistort(img, cam_matrix, distortion_coefficients, None, cam_matrix)
 
 
 def convert_to_hls(img):
@@ -383,7 +384,7 @@ def process_image(original, previous_lane=None):
     """
     left_line, right_line = create_lane_lines(original)
 
-    image_dict = {UNDISTORTED: undistort_image(original)}
+    image_dict = {UNDISTORTED: undistort_image(original, camera_matrix, distortion_coeffs)}
     image_dict[HLS] = convert_to_hls(image_dict[UNDISTORTED])
     image_dict[S] = image_dict[HLS][:, :, 2]
     image_dict[H] = image_dict[HLS][:, :, 0]
@@ -467,23 +468,39 @@ def calibrate_camera():
     img_points = []  # 2d points in image plane.
     gray = None
 
+    output_path = 'camera_cal_output'
+    if not os.path.exists(output_path):
+        os.makedirs(output_path)
+
     for fname in glob.glob('camera_cal/*.jpg'):
         img = cv2.imread(fname)
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        basename = os.path.basename(fname)
 
         # Find the corners in every image.
         # The grid is cropped in some images, so try several
-        # combinations of row/column counts
-        # TODO: figure out why calibration4.jpg always fails
+        # combinations of row/column counts until we get a successful detection
         for num_rows, num_columns in [(6, 9), (5, 9), (6, 8), (7, 6)]:
             ret, corners, objp = find_corners(gray, num_columns, num_rows)
             if ret:
                 obj_points.append(objp)
                 img_points.append(corners)
+                cv2.drawChessboardCorners(img, (num_rows,num_columns), corners, ret)
+                cv2.imwrite(os.path.join(output_path, basename), img)
                 break
+            else:
+                cv2.drawChessboardCorners(img, (num_rows,num_columns), corners, ret)
+                cv2.imwrite(os.path.join(output_path, basename+"_failed_{}_{}.jpg".format(num_rows,num_columns)), img)
 
     ret, mtx, dist, rvecs, tvecs = \
         cv2.calibrateCamera(obj_points, img_points, gray.shape[::-1], None, None)
+
+    for fname in glob.glob('camera_cal/*.jpg'):
+        basename = os.path.basename(fname)
+        img = cv2.imread(fname)
+        undistored = undistort_image(img, mtx, dist)
+        cv2.imwrite(os.path.join(output_path, basename + "_undistorted.jpg"), undistored)
+
     return mtx, dist
 
 

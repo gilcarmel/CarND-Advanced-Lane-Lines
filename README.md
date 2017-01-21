@@ -77,13 +77,17 @@ This is one of the weaker parts of my pipeline - it does the job on the project 
 Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
 
 
-| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/writeup_images/frame_0610/07_top_down.jpg" width="400"/>        | 
+| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down.jpg" width="400"/>        | 
 |:-------------:|:-------------:|
 | perspective view      | bird's eye view |
 
 
 The source quadrilateral's points are hard coded into the pipeline based on a measurement of one "vanilla" frame of the video. Unfortunately the location of the source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the bird's eye view, which reduces our confidence in the detection: 
-<img src="./writeup_images/bad_warp.png" width="400"/>
+
+
+| <img src="./writeup_images/bad_warp.png" width="400"/>       |
+|:-------------:|
+| Skewed lane lines caused by a bad perspective warp   |
 
 [Code](./lane_finder.py#L152-L199)
 

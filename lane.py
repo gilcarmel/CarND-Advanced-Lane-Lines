@@ -1,4 +1,3 @@
-
 # maximum allowed difference between second degree coefficients for polynomials to be considered parallel
 import math
 
@@ -70,7 +69,7 @@ class Lane:
         self.curvature_radius = (l_radius + r_radius) * 0.5
 
         # We're confident if the ratio between the two lines' curve radii is reasonable
-        self.curve_ratio = min(abs(l_radius), abs(r_radius)) / max(abs(l_radius),abs(r_radius))
+        self.curve_ratio = min(abs(l_radius), abs(r_radius)) / max(abs(l_radius), abs(r_radius))
         return self.curve_ratio > SAME_CURVATURE_RATIO_THRESH
 
     def is_confident(self):
@@ -106,9 +105,10 @@ class Lane:
     def is_straight(self):
         l_radius = abs(self.left_line.radius_of_curvature)
         r_radius = abs(self.right_line.radius_of_curvature)
-        return l_radius > CURVE_RADIUS_STRAIGHT_THRESH \
-            and r_radius > CURVE_RADIUS_STRAIGHT_THRESH
+        return \
+            l_radius > CURVE_RADIUS_STRAIGHT_THRESH and \
+            r_radius > CURVE_RADIUS_STRAIGHT_THRESH
 
     def calculate_center_offset(self, image_width):
-        pixel_offset = (self.right_line.x_pixels + self.left_line.x_pixels - image_width)/2
+        pixel_offset = (self.right_line.x_pixels + self.left_line.x_pixels - image_width) / 2
         self.center_offset = pixel_offset * self.left_line.x_meters_per_pixel

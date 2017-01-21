@@ -7,6 +7,7 @@ import numpy
 imageio.plugins.ffmpeg.download()
 from moviepy.editor import VideoFileClip
 import lane_finder
+# noinspection PyUnresolvedReferences
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
@@ -80,13 +81,11 @@ def generate_output_frame(img):
     global frame_number
     global basename
     global last_confident_image_dict
-    global last_confident_frame_number
 
     lane, image_dict = lane_finder.process_image(img, previous_confident_lane())
     lanes.append(lane)
     if lane.confident:
         confident_lanes.append((frame_number, lane))
-        last_confident_frame_number = frame_number
         last_confident_image_dict = image_dict
 
     final_image = make_final_image(image_dict)
@@ -123,6 +122,7 @@ def plot_curvature_radius():
         'curvatures',
         (-5000, 5000),
         marker=',')
+
 
 def plot_full_search():
     """
@@ -182,7 +182,7 @@ def plot_curvature_ratio():
 
 
 def plot_if_true(values, booleans, y_range, label, filename_suffix):
-    y = [v for v,b in zip(values,booleans) if b]
+    y = [v for v, b in zip(values, booleans) if b]
     x = [index for index, b in enumerate(booleans) if b]
     plot_values(y, y_range, label, filename_suffix, x, ',')
 
@@ -256,6 +256,7 @@ def plot_left_right_values(left_values, right_values, left_label, right_label, f
     :param right_label: label for right values
     :param filename_suffix: suffix of filename to save the image
     :param y_range: y range
+    :param marker: marker shape code, e.g. '.' (plots a line if None)
     :return: None
     """
     fig = Figure()

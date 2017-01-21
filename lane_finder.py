@@ -44,6 +44,7 @@ FAR_RIGHT = 'FAR_RIGHT'
 NEAR_LEFT = 'NEAR_LEFT'
 NEAR_RIGHT = 'NEAR_RIGHT'
 
+
 # Definition of a pipeline parameter
 class ParamDef(object):
     def __init__(self, min_value, max_value, step, description):
@@ -193,20 +194,21 @@ def get_perspective_src(img):
     return [(far_left, top), (far_right, top), (near_left, bottom), (near_right, bottom)]
 
 
-def find_lane_lines_in_bands(img, left_line, right_line, left_peak=None, right_peak=None):
+def find_lane_lines_in_bands(img, left_line, right_line, prev_left_x=None, prev_right_x=None):
     """
     Find points on the left and right lane lines by searching
     stacked vertical bands.
 
     :param img: thresholded, top-down view
-    :param histogram: histogram of full image along x-axis
     :param left_line: Upon return, left_line.lane_points will contain detected points
     :param right_line: Upon return, left_line.lane_points will contain detected points
+    :param prev_left_x: previous x position of left lane line (None if no previous line detected)
+    :param prev_right_x: previous x prosition of right lane line (None if no previous line detected)
     """
     num_bands = 10
     search_window_half_width_ratio = 0.05
-    left_line.set_lane_points(search_climbing_bands(img, left_peak, num_bands, search_window_half_width_ratio))
-    right_line.set_lane_points(search_climbing_bands(img, right_peak, num_bands, search_window_half_width_ratio))
+    left_line.set_lane_points(search_climbing_bands(img, prev_left_x, num_bands, search_window_half_width_ratio))
+    right_line.set_lane_points(search_climbing_bands(img, prev_right_x, num_bands, search_window_half_width_ratio))
 
 
 def plot_histogram_to_array(histogram):
@@ -245,7 +247,7 @@ def search_climbing_bands(img, start_x, num_bands, search_window_half_width_rati
     width = int(img.shape[1])
     band_height = int(float(height) / num_bands)
     cur_bottom = height - 1
-    points = [] # Points detected
+    points = []  # Points detected
     search_window_half_width = int(search_window_half_width_ratio * width)
     for _ in np.arange(0, num_bands):
         # Create a search window above the previous band and centered horizontally
@@ -253,7 +255,7 @@ def search_climbing_bands(img, start_x, num_bands, search_window_half_width_rati
         search_left_start = max(0, start_x - search_window_half_width)
         search_left_end = min(width - 1, start_x + search_window_half_width)
         search_window = img[
-                        max(0,cur_bottom - band_height): cur_bottom,
+                        max(0, cur_bottom - band_height): cur_bottom,
                         int(search_left_start):int(search_left_end)
                         ]
         # Find the center of mass within the search window and add it to the line
@@ -280,7 +282,6 @@ def find_histogram(img):
     left_peak = np.argmax(histogram[:half_width])
     right_peak = half_width + np.argmax(histogram[half_width:])
     return histogram, left_peak, right_peak
-
 
 
 def draw_lane_line_points(img, left_line, right_line):
@@ -369,11 +370,12 @@ def fill_lane_region(img, top_down_lane_fill):
     return cv2.addWeighted(img, 1., front_facing_lane_fill, 0.5, 0)
 
 
-def process_image(original, previous_lane = None):
+def process_image(original, previous_lane=None):
     """
     Perform lane finding on an image
     :param original: input image
-    :return: (left line, right line, image dictionary for all pipeline steps
+    :param previous_lane: previous lane detection
+    :return: (Lane, image dictionary for all pipeline steps)
     """
     left_line, right_line = create_lane_lines(original)
 
@@ -425,7 +427,6 @@ def create_lane_lines(original):
     :return: (left Line, right Line)
     """
     height = original.shape[0]
-    width = original.shape[1]
     # These are derived by dividing known distances by measured pixel distances in the top-down view
     ym_per_pix = 9.14 / 230  # meters per pixel in y dimension (9.14m is the distance between dashes on a lane line)
     xm_per_pix = 3.7 / 640  # meteres per pixel in x dimension (3.7m is the width of a lane)
@@ -525,5 +526,3 @@ def annotate_image(img, curvature_radius, center_lane_offset):
 
 # determine camera calibration parameters
 camera_matrix, distortion_coeffs = calibrate_camera()
-
-

@@ -53,7 +53,7 @@ We use cv2.undistort() to undistort the input image using the calibration parame
 [Code](./lane_finder.py#L89-L97)
 
 ### Detect lane separator "candidate pixels"
-We generate a binary image with pixels that are good bets to be part of the lane separator painted white: TODO image
+We generate a binary image with pixels that are good bets to be part of the lane separator painted white.
 
 This image is obtained by ORing together three separate images:
 
@@ -134,12 +134,26 @@ Note that the curvature radius calculation is extremely sensitive to the correct
 ### Perform a confidence check on the detection
 To determine whether we are confident in the prediction, we detected lane lines must be:
 * Roughly 3.7 meters apart (per US standards)
-* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). 
-* Roughly the same curvature radius 
+* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip. See images below.
+* Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit.
 
-Sample images TODO
 
-Note: I determined reasonable thresholds for what is considered "parallel" by eyeballing a plot of the left and right polynomial coefficients over the lenght of an entire video clip: TODO
+
+ | <img src="./writeup_images/clip_plots/project_video_first_deg.jpg" width="400"/>        | <img src="./writeup_images/clip_plots/project_video_second_deg.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| Linear coefficients      | Square coefficients |
+
+
+Here's a plot of the confidence determination for each of these factors over the course of the video clip:
+
+| <img src="./writeup_images/clip_plots/project_video_is_confident_width.jpg" width="250"/>        | <img src="./writeup_images/clip_plots/project_video_is_confident_parallel.jpg" width="250"/>        | <img src="./writeup_images/clip_plots/project_video_is_confident_radius.jpg" width="250"/> |
+|:-------------:|:-------------:|:-------------:|
+| Reasonable lane width?      | Roughly parallel? | Same curve radius? |
+
+
+| <img src="./writeup_images/clip_plots/project_video_is_confident.jpg" width="400"/>       |
+|:-------------:|
+| Overall confidence (width AND parallel AND radius)   |
 
 [Code](./lane.py#L75-L100)
 

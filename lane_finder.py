@@ -192,7 +192,7 @@ def get_perspective_src(img):
     return [(far_left, top), (far_right, top), (near_left, bottom), (near_right, bottom)]
 
 
-def find_lane_lines_in_bands(img, histogram, left_line, right_line):
+def find_lane_lines_in_bands(img, left_line, right_line, left_peak=None, right_peak=None):
     """
     Find points on the left and right lane lines by searching
     stacked vertical bands.
@@ -202,9 +202,6 @@ def find_lane_lines_in_bands(img, histogram, left_line, right_line):
     :param left_line: Upon return, left_line.lane_points will contain detected points
     :param right_line: Upon return, left_line.lane_points will contain detected points
     """
-    half_width = int(img.shape[1] / 2)
-    left_peak = np.argmax(histogram[:half_width])
-    right_peak = half_width + np.argmax(histogram[half_width:])
     num_bands = 10
     search_window_half_width_ratio = 0.05
     left_line.set_lane_points(search_climbing_bands(img, left_peak, num_bands, search_window_half_width_ratio))
@@ -274,10 +271,15 @@ def find_histogram(img):
     Calculate the histogram of pixel values along th x-axis
     (i.e. the sum of pixel values for each column of the image)
     :param img: input image
-    :return: histogram
+    :return: histogram, left peak, right peak
     """
     half_height = int(img.shape[0] / 2)
-    return np.sum(img[half_height:, :], axis=0)
+    histogram = np.sum(img[half_height:, :], axis=0)
+    half_width = int(img.shape[1] / 2)
+    left_peak = np.argmax(histogram[:half_width])
+    right_peak = half_width + np.argmax(histogram[half_width:])
+    return histogram, left_peak, right_peak
+
 
 
 def draw_lane_line_points(img, left_line, right_line):
@@ -366,7 +368,7 @@ def fill_lane_region(img, top_down_lane_fill):
     return cv2.addWeighted(img, 1., front_facing_lane_fill, 0.5, 0)
 
 
-def process_image(original):
+def process_image(original, previous_lane = None):
     """
     Perform lane finding on an image
     :param original: input image
@@ -382,9 +384,22 @@ def process_image(original):
     image_dict[S_THRESH] = threshold_image(image_dict[S], params[S_MIN], params[S_MAX])
     image_dict[COMBINED_BINARY] = combined_binary(image_dict)
     image_dict[TOP_DOWN] = perspective_projection(image_dict[COMBINED_BINARY])
-    histogram = find_histogram(image_dict[TOP_DOWN])
-    image_dict[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
-    find_lane_lines_in_bands(image_dict[TOP_DOWN], histogram, left_line, right_line)
+
+    # If we don't have a prior detetion, use histogram peaks to find
+    # search starting points
+    if previous_lane is None:
+        histogram, left_search_x, right_search_x = find_histogram(image_dict[TOP_DOWN])
+        image_dict[BOTTOM_HALF_HIST] = plot_histogram_to_array(histogram)
+    # Otherwise start searching from the previous detection's x position
+    else:
+        left_search_x = previous_lane.left_line.x_pixels
+        right_search_x = previous_lane.right_line.x_pixels
+    find_lane_lines_in_bands(
+        image_dict[TOP_DOWN],
+        left_line, right_line,
+        left_search_x,
+        right_search_x)
+
     image_dict[LANE_LINE_POINTS] = draw_lane_line_points(image_dict[TOP_DOWN], left_line, right_line)
     image_dict[LANE_LINE_POLYS] = draw_lane_line_polynomials(
         image_dict[LANE_LINE_POINTS],
@@ -394,7 +409,7 @@ def process_image(original):
     image_dict[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
         image_dict[UNDISTORTED],
         image_dict[LANE_FILL])
-    return Lane(left_line, right_line), image_dict
+    return Lane(left_line, right_line, previous_lane is None), image_dict
 
 
 def create_lane_lines(original):

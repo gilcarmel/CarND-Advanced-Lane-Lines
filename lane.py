@@ -15,15 +15,16 @@ class Lane:
     Data about a detected lane (left line, right line, confidence, etc)
     """
 
-    def __init__(self, left_line, right_line):
+    def __init__(self, left_line, right_line, is_full_search):
 
         self.left_line = left_line
         self.right_line = right_line
         self.curve_ratio = -1
         self.curvature_radius = -1
         self.confident = False
+        self.is_full_search = is_full_search
 
-        if (left_line.is_detected and right_line.is_detected):
+        if left_line.is_detected and right_line.is_detected:
             self.lane_width = self.right_line.x - self.left_line.x
             self.confident = self.is_confident()
             self.width = right_line.x - left_line.x

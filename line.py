@@ -11,8 +11,11 @@ class Line:
         self.y_meters_per_pixel = y_meters_per_pixel
         # bottom of image in pixels, representing car's current location
         self.bottom_y = bottom_y
-        # x value of the line bottom in pixels
+        self.bottom_y_meters = self.bottom_y * self.y_meters_per_pixel
+        # x value of the line bottom in meters
         self.x = None
+        # x value of the line bottom in pixels
+        self.x_pixels = None
         # detected points forming the line in pixels
         self.lane_points = None
         # minimum (aka top) y value for detected lane line
@@ -44,7 +47,8 @@ class Line:
             self.polynomial_fit = fit_poly(self.lane_points)
             self.lane_points_m = scale_points(self.lane_points, self.x_meters_per_pixel, self.y_meters_per_pixel)
             self.polynomial_fit_m = fit_poly(self.lane_points_m)
-            self.x = np.polyval(self.polynomial_fit_m, self.min_y * self.y_meters_per_pixel)
+            self.x = np.polyval(self.polynomial_fit_m, self.bottom_y_meters)
+            self.x_pixels = np.polyval(self.polynomial_fit, self.bottom_y)
             self.calculate_curve_radius()
             self.is_detected = True
 
@@ -53,10 +57,11 @@ class Line:
         Calculate the curvature radius in meters
         :return:
         """
-        bottom_y_meters = self.bottom_y * self.y_meters_per_pixel
         polynomial = self.polynomial_fit_m
-        self.radius_of_curvature = ((1 + (2 * polynomial[0] * bottom_y_meters + polynomial[1]) ** 2) ** 1.5) \
-            / np.absolute(2 * polynomial[0])
+        self.radius_of_curvature = \
+            ((1 + (2 * polynomial[0] * self.bottom_y_meters +
+                   polynomial[1]) ** 2) ** 1.5) \
+                / np.absolute(2 * polynomial[0])
 
 
 def fit_poly(points):

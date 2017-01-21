@@ -111,8 +111,8 @@ if __name__ == "__main__":
                 lf.NEAR_LEFT,
                 lf.NEAR_RIGHT)
             display_image(lf.TOP_DOWN, intermediate_images[lf.TOP_DOWN])
-            # display_image(lf.BOTTOM_HALF_HIST, output[lf.BOTTOM_HALF_HIST])
-            # display_image(lf.LANE_LINE_POINTS, output[lf.LANE_LINE_POINTS])
+            display_image(lf.BOTTOM_HALF_HIST, intermediate_images[lf.BOTTOM_HALF_HIST])
+            # display_image(lf.LANE_LINE_POINTS, intermediate_images[lf.LANE_LINE_POINTS])
             display_image(lf.LANE_LINE_POLYS, intermediate_images[lf.LANE_LINE_POLYS])
             display_image(lf.LANE_FILL, intermediate_images[lf.LANE_FILL])
             display_image(lf.FRONT_CAM_WITH_LANE_FILL, intermediate_images[lf.FRONT_CAM_WITH_LANE_FILL])

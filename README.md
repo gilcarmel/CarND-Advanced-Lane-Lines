@@ -94,15 +94,27 @@ The source quadrilateral's points are hard coded into the pipeline based on a me
 ### Find the left and right lane lines
 
 Now we search for the left and right lane lines. The algorithm is as follows:
-* Generate a histogram along x axis for the bottom of the image
+* Generate a histogram along x axis for the bottom of the image. The peaks of the histogram determine the starting x position for searching for lane lines starting at the bottom of the image.
+
+| <img src="./writeup_images/frame_0610/08_bottom_half_hist.jpg" width="400"/>       |
+|:-------------:|
+| Histogram of white pixels in each column of the bottom half of the image    |
+
 * For each lane line (left and right):
   * Divide the image into ten horizontal bands. From the bottom, for each band:
     * Create search window centered horizontally above the the previous band's detection (or histogram peak for the bottom band)
     * Calculate the center of mass of white pixels in the search window
     * Add the center of mass to the list of points
-  TODO: image
+
+| <img src="./writeup_images/frame_0610/09_lane_line_points.jpg" width="400"/>       |
+|:-------------:|
+| Lane line points detected by calculating the center of mass of stacked search windows    |
+
   * Fit a second degree polynomial to all the detected points
-  TODO: image
+ 
+| <img src="./writeup_images/frame_0610/10_lane_line_polynomials.jpg" width="400"/>       |
+|:-------------:|
+| Second degree polynomials fitted to detected points    |
 
 [Code](./lane_finder.py#L202-L289)
 

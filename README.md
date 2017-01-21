@@ -1,8 +1,8 @@
 
 [//]: # (Image References)
 
-[chessboard]
-[undistorted_chessboard]
+[chessboard]: 
+[undistorted_chessboard]: ./camera_cal_output/calibration1.jpg_undistorted.jpg
 [image1]: ./examples/undistort_output.png "Undistorted"
 [image2]: ./test_images/test1.jpg "Road Transformed"
 [image3]: ./examples/binary_combo_example.jpg "Binary Example"
@@ -45,8 +45,11 @@ cv2.calibrateCamera() calculates calibration parameters given a set of 3D points
 * 2D image points are detected by cv2.findChessboardCorners().
 * 3D points are generated using a regular grid on the (x,y), with z=0.
 
-[chessboard] Distorted image with corners detected
-[undistorted_chessboard] Undistorted image
+| <img src="./camera_cal_output/calibration1.jpg" width="400"/>        | <img src="./camera_cal_output/calibration1.jpg_undistorted.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| Original with corners detected      | Undistorted |
+
+
 
 [Code](./lane_finder.py#L460-L524)
 

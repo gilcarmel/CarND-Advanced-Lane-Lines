@@ -47,15 +47,15 @@ class Lane:
         Check with lane lines have a similar curve radisu
         :return: True if similar, False otherwise
         """
-        l_radius = self.left_line.radius_of_curvature
-        r_radius = self.right_line.radius_of_curvature
         # If the lines are basically straight, consider them parallel
         if self.is_straight():
             # If basically straight, make it official
-            self.curvature_radius = CURVE_RADIUS_STRAIGHT_THRESH
+            self.curvature_radius = CURVE_RADIUS_STRAIGHT_THRESH * 1000
             self.curve_ratio = 1
             return True
 
+        l_radius = self.left_line.radius_of_curvature
+        r_radius = self.right_line.radius_of_curvature
         self.curvature_radius = (l_radius + r_radius) * 0.5
         self.curve_ratio = min(l_radius, r_radius) / max(l_radius,r_radius)
         return self.curve_ratio > SAME_CURVATURE_RATIO_THRESH
@@ -91,8 +91,8 @@ class Lane:
         return 3.2 < self.lane_width < 4.2
 
     def is_straight(self):
-        l_radius = self.left_line.radius_of_curvature
-        r_radius = self.right_line.radius_of_curvature
+        l_radius = abs(self.left_line.radius_of_curvature)
+        r_radius = abs(self.right_line.radius_of_curvature)
         return l_radius > CURVE_RADIUS_STRAIGHT_THRESH \
             and r_radius > CURVE_RADIUS_STRAIGHT_THRESH
 

@@ -74,7 +74,7 @@ def plot_curvature_radius():
         'left line curvature (m)',
         'right line curvature (m)',
         'curvatures',
-        (0, 5000))
+        (-5000, 5000))
 
 def plot_full_search():
     """
@@ -119,9 +119,9 @@ def plot_confident_curve_radius():
 
 
 def plot_confident_radius_values():
-    y = [l.curvature_radius for l in lanes]
+    y = [1.0 / l.curvature_radius for l in lanes]
     confident = [l.confident for l in lanes]
-    plot_if_true(y, confident, (0, 1000), "Confident curve radius", "confident radius value")
+    plot_if_true(y, confident, (-0.01, 0.01), "inverse curve radius", "inv_curve_radius")
 
 
 def plot_curvature_ratio():

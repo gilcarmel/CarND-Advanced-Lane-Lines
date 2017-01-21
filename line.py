@@ -63,6 +63,10 @@ class Line:
                    polynomial[1]) ** 2) ** 1.5) \
                 / np.absolute(2 * polynomial[0])
 
+        # If the lane is curving left, negate the radius
+        if polynomial[0] < 0:
+            self.radius_of_curvature *= -1
+
 
 def fit_poly(points):
     """

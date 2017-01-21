@@ -1,16 +1,4 @@
 
-[//]: # (Image References)
-
-[chessboard]: 
-[undistorted_chessboard]: ./camera_cal_output/calibration1.jpg_undistorted.jpg
-[image1]: ./examples/undistort_output.png "Undistorted"
-[image2]: ./test_images/test1.jpg "Road Transformed"
-[image3]: ./examples/binary_combo_example.jpg "Binary Example"
-[image4]: ./examples/warped_straight_lines.jpg "Warp Example"
-[image5]: ./examples/color_fit_lines.jpg "Fit Visual"
-[image6]: ./examples/example_output.jpg "Output"
-[video1]: ./project_video.mp4 "Video"
-
 **Advanced Lane Finding Project**
 
 This project uses computer vision techniques to detect lane information from a car's front-facing camera. From an input video clip, it produces an output video marked and annotated with lane info. I completed this project as part of Udacity's Self-Driving Car nanodegree program.
@@ -58,7 +46,9 @@ We use cv2.undistort() to undistort the input image using the calibration parame
 
     cv2.undistort(img, cam_matrix, distortion_coefficients, None, cam_matrix)
 
-Here's the original image and the undistorted image. TODO
+| <img src="./writeup_images/frame_0610/00_orig.jpg" width="400"/>        | <img src="./writeup_images/frame_0610/00_undistorted.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| Original      | Undistorted |
 
 [Code](./lane_finder.py#L89-L97)
 
@@ -86,10 +76,14 @@ This is one of the weaker parts of my pipeline - it does the job on the project 
 
 Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
 
-Source image with 4 points
-Destination image with 4 points
 
-The source points are hard coded into the pipeline based on a measurement of one "vanilla" frame of the video. Unfortunately I found that the locations of the source source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the top-down view, which reduces our confidence in the detection: TODO
+| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/writeup_images/frame_0610/07_top_down.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| perspective view      | bird's eye view |
+
+
+The source quadrilateral's points are hard coded into the pipeline based on a measurement of one "vanilla" frame of the video. Unfortunately the location of the source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the bird's eye view, which reduces our confidence in the detection: 
+<img src="./writeup_images/bad_warp.png" width="400"/>
 
 [Code](./lane_finder.py#L152-L199)
 

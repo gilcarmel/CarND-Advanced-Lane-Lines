@@ -29,7 +29,10 @@ def make_final_image(image_dict):
     """
     smoothed_prediction = get_smoothed_detection()
     if smoothed_prediction is None:
-        return image_dict[lane_finder.UNDISTORTED]
+        # Draw the fill region detected for this frame, but in a different color
+        return lane_finder.fill_lane_region(
+            image_dict[lane_finder.UNDISTORTED],
+            image_dict[lane_finder.LANE_FILL])
 
     curvature_radius, center_lane_offset, lane_region = smoothed_prediction
 

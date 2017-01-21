@@ -20,9 +20,12 @@ from line import Line
 UNDISTORTED = '00_undistorted'
 HLS = '01_hls'
 S = '02_s'
+H = '02_h'
+L = '02_l'
 S_THRESH = '03_s_thresh'  # Thresholded by S channel
 GRAY = '04_grey'
 SOBEL_X = '05_sobel_x'  # Thresholded by sobel in X direction
+SOBEL_X_S = '05_sobel_x_s'  # S channel thresholded by sobel in X direction
 COMBINED_BINARY = '06_combined_binary'  # Combined thresholded images
 TOP_DOWN = '07_top_down'  # top down view
 BOTTOM_HALF_HIST = '08_bottom_half_hist'  # histogram of bottom half of the image
@@ -71,10 +74,10 @@ param_defs = {
 
 # Parameters to use for various steps of the pipeline
 params = {
-    SOBEL_X_KERNEL_SIZE: 5,
-    SOBEL_X_MIN: 30,
+    SOBEL_X_KERNEL_SIZE: 7,
+    SOBEL_X_MIN: 22,
     SOBEL_X_MAX: 100,
-    S_MIN: 170,
+    S_MIN: 139,
     S_MAX: 255,
     FAR_LEFT: 0.374,
     FAR_RIGHT: 0.647,
@@ -138,9 +141,10 @@ def combined_binary(imgs_dict):
     :return: combined binary image
     """
     sobel_x = imgs_dict[SOBEL_X]
+    sobel_x_s = imgs_dict[SOBEL_X_S]
     s_thresh = imgs_dict[S_THRESH]
     combined = np.zeros_like(sobel_x, dtype=np.uint8)
-    combined[(sobel_x > 0) | (s_thresh > 0)] = 255
+    combined[(sobel_x > 0) | (sobel_x_s > 0) | (s_thresh > 0)] = 255
     return combined
 
 
@@ -350,7 +354,7 @@ def get_poly_points(max_y, min_y, poly):
     return points
 
 
-def draw_lane_fill_region(img, left_line, right_line):
+def draw_lane_fill_region(img, left_line, right_line, color=(100, 255, 0)):
 
     img = np.zeros_like(img)
 
@@ -361,7 +365,7 @@ def draw_lane_fill_region(img, left_line, right_line):
     left_points = get_poly_points(max_y, left_line.min_y, left_line.polynomial_fit)
     right_points = get_poly_points(max_y, right_line.min_y, right_line.polynomial_fit)[::-1]
     all_points = np.concatenate([left_points, right_points, left_points[:1]])
-    cv2.fillPoly(img, [all_points], [100, 255, 0])
+    cv2.fillPoly(img, [all_points], color)
     return img
 
 
@@ -382,7 +386,10 @@ def process_image(original, previous_lane=None):
     image_dict = {UNDISTORTED: undistort_image(original)}
     image_dict[HLS] = convert_to_hls(image_dict[UNDISTORTED])
     image_dict[S] = image_dict[HLS][:, :, 2]
+    image_dict[H] = image_dict[HLS][:, :, 0]
+    image_dict[L] = image_dict[HLS][:, :, 1]
     image_dict[GRAY] = convert_to_gray(image_dict[UNDISTORTED])
+    image_dict[SOBEL_X_S] = thresholded_sobel_x(image_dict[S])
     image_dict[SOBEL_X] = thresholded_sobel_x(image_dict[GRAY])
     image_dict[S_THRESH] = threshold_image(image_dict[S], params[S_MIN], params[S_MAX])
     image_dict[COMBINED_BINARY] = combined_binary(image_dict)

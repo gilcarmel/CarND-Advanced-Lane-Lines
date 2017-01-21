@@ -77,7 +77,7 @@ This is one of the weaker parts of my pipeline - it does the job on the project 
 Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
 
 
-| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down_with_quad.jpg" width="400"/>        | 
+| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down_with_quad.png" width="400"/>        | 
 |:-------------:|:-------------:|
 | perspective view with source quad     | bird's eye view with destination quad |
 
@@ -129,19 +129,29 @@ The curvature radius at a particular point in a polynomial can be calculated usi
         
 To calculate the curve radius for the lane, we average the left and right curvature radius. This value is only considered valid in the case of a confident detection (see below).
 
-Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so in practice I found the curve radius to bounce around quite a bit in reaction to minor changes in the car's pitch.
+Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so it bounces around quite a bit in reaction to minor changes in the car's pitch.
 
 ### Perform a confidence check on the detection
 To determine whether we are confident in the prediction, we detected lane lines must be:
-* Roughly 3.7 meters apart (per US standards)
-* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip. See images below.
-* Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit.
+* Roughly 3.7 meters apart (per US standards). Here's a plot of the left and right lane line positions as detected over the entire video clip:
 
+| <img src="./writeup_images/clip_plots/project_video_positions.jpg" width="400"/>       |
+|:-------------:|
+| Left and right lane line positions   |
+
+* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip:
 
 
  | <img src="./writeup_images/clip_plots/project_video_first_deg.jpg" width="400"/>        | <img src="./writeup_images/clip_plots/project_video_second_deg.jpg" width="400"/>        | 
 |:-------------:|:-------------:|
 | Linear coefficients      | Square coefficients |
+
+* Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit and reduce the noise in this signal:
+
+
+| <img src="./writeup_images/clip_plots/project_video_curvatures.jpg" width="400"/>       |
+|:-------------:|
+| Left and right lane line curvature   |
 
 
 Here's a plot of the confidence determination for each of these factors over the course of the video clip:
@@ -158,9 +168,9 @@ Here's a plot of the confidence determination for each of these factors over the
 [Code](./lane.py#L75-L100)
 
 ### Warp back onto the original image.
-We filled the region between the left and right lane lines, and warp it back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
+After filling the region between the left and right lane lines, it gets warped back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
 
- | <img src="./writeup_images/frame_0610/11_lane_fill_region.jpg" width="400"/>        | <img src="./writeup_images/frame_0610/12_front_cam_with_lane_fill.jpg" width="400"/>        | 
+| <img src="./writeup_images/frame_0610/11_lane_fill_region.jpg" width="400"/>        | <img src="./writeup_images/frame_0610/12_front_cam_with_lane_fill.jpg" width="400"/>        | 
 |:-------------:|:-------------:|
 | Detected lane region painted    | Perspective-warped and blended with original |
 
@@ -169,7 +179,7 @@ We filled the region between the left and right lane lines, and warp it back as 
 
 | <img src="./writeup_images/frame_0610/12_annotated.jpg" width="400"/>       |
 |:-------------:|
-| Overall confidence (width AND parallel AND radius)   |
+| Final annotated image  |
 
 [Code](lane_finder.py#L545-L549)
 
@@ -179,21 +189,9 @@ Video processing uses information from the previous frames to smooth predictions
 * For each frame:
    * Run the single-frame detection. If a recent frame provided a confident detection, run an optimized version using the previous detection as additional input. The optimization is simple - skip the full histogram search during lane line detection, and center the bottom band's search window around the lane positions from the previous detection.
    * Average the confident predictions over the last 10 frames to generate curve radius and lane position
-   * I also wanted to average the lane line positions, so the lane region appears smoother o
+   * I also wanted to average the lane line positions, so the lane region changes more fluidly between frames in the output video, but I ran out of time!
 
 Code [clip_processor.py](./clip_processor.py); [per-frame code](./clip_processor.py#L78-L102)
-
-The video processor also generates some plots to show various metrics over the length of the video:
-Left/right lane line curvature:
-Left/right lane line polynomial linear coefficient
-Left/right lane line polynomial square coefficient
-Left/right lane line positions
-Which frames did not have a recent confident prediction and performed a full histogram search
-Inverse curve radius
-Confident parallel
-Confident radius
-Confident lane width
-Confident overall
 
 Here's a [link to my video result](./project_video_out.mp4) TODO
 
@@ -201,7 +199,8 @@ Here's a [link to my video result](./project_video_out.mp4) TODO
 
 ###Discussion
 
-####1. Briefly discuss any problems / issues you faced in your implementation of this project.  Where will your pipeline likely fail?  What could you do to make it more robust?
-
-Here I'll talk about the approach I took, what techniques I used, what worked and why, where the pipeline might fail and how I might improve it if I were going to pursue this project further.  
+The main problems in my implementation (and suggestions for improvement) can be summarized as follows:
+* Filters for determining lane-line pixel candidates are not robust enough. They fail miserably on the challenge videos which introduce different lighting and road conditions. Some more experimentation is needed to help reject shadow lines, use known lane width as a clue, color balance the input image, etc. A more advanced UI for interactively tweaking algorithm parameters on a set of test images would be a huge help here.
+* The hard-coded perspective warp is extremely unreliable and yields a lot of bad projections. A possible solution for video processing is to perform plane detection across consecutive video frames. Once the road's plane equation relative to the camera is determined, the perspective warp can be made more reliable. This would also help the detection on sloped roads.
+* An automated test bed could be useful to ensure that algorithm improvements for a single difficult image do not adversely affect the detection in a full suite of test images.
 

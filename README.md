@@ -53,7 +53,7 @@ We use cv2.undistort() to undistort the input image using the calibration parame
 [Code](./lane_finder.py#L89-L97)
 
 ### Detect lane separator "candidate pixels"
-We generate a binary image with pixels that are good bets to be part of the lane separator painted white: TODO image
+We generate a binary image with pixels that are good bets to be part of the lane separator painted white.
 
 This image is obtained by ORing together three separate images:
 
@@ -77,9 +77,9 @@ This is one of the weaker parts of my pipeline - it does the job on the project 
 Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
 
 
-| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down.jpg" width="400"/>        | 
+| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down_with_quad.jpg" width="400"/>        | 
 |:-------------:|:-------------:|
-| perspective view      | bird's eye view |
+| perspective view with source quad     | bird's eye view with destination quad |
 
 
 The source quadrilateral's points are hard coded into the pipeline based on a measurement of one "vanilla" frame of the video. Unfortunately the location of the source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the bird's eye view, which reduces our confidence in the detection: 
@@ -111,7 +111,7 @@ In order to convert pixel measurements into meters we need to calculate a conver
 
     # meters per pixel in y dimension (9.14m is the distance between dashes on a lane line)
     ym_per_pix = 9.14 / 230 
-    # meteres per pixel in x dimension (3.7m is the width of a lane)
+    # meters per pixel in x dimension (3.7m is the width of a lane)
     xm_per_pix = 3.7 / 640  
 
 The vehicle's position in the lane is determined by comparing the left and right lane line positions to the center of the image:
@@ -134,24 +134,44 @@ Note that the curvature radius calculation is extremely sensitive to the correct
 ### Perform a confidence check on the detection
 To determine whether we are confident in the prediction, we detected lane lines must be:
 * Roughly 3.7 meters apart (per US standards)
-* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). 
-* Roughly the same curvature radius 
+* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip. See images below.
+* Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit.
 
-Sample images TODO
 
-Note: I determined reasonable thresholds for what is considered "parallel" by eyeballing a plot of the left and right polynomial coefficients over the lenght of an entire video clip: TODO
+
+ | <img src="./writeup_images/clip_plots/project_video_first_deg.jpg" width="400"/>        | <img src="./writeup_images/clip_plots/project_video_second_deg.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| Linear coefficients      | Square coefficients |
+
+
+Here's a plot of the confidence determination for each of these factors over the course of the video clip:
+
+| <img src="./writeup_images/clip_plots/project_video_is_confident_width.jpg" width="250"/>        | <img src="./writeup_images/clip_plots/project_video_is_confident_parallel.jpg" width="250"/>        | <img src="./writeup_images/clip_plots/project_video_is_confident_radius.jpg" width="250"/> |
+|:-------------:|:-------------:|:-------------:|
+| Reasonable lane width?      | Roughly parallel? | Same curve radius? |
+
+
+| <img src="./writeup_images/clip_plots/project_video_is_confident.jpg" width="400"/>       |
+|:-------------:|
+| Overall confidence (width AND parallel AND radius)   |
 
 [Code](./lane.py#L75-L100)
 
 ### Warp back onto the original image.
 We filled the region between the left and right lane lines, and warp it back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
 
-Images: TODO
+ | <img src="./writeup_images/frame_0610/11_lane_fill_region.jpg" width="400"/>        | <img src="./writeup_images/frame_0610/12_front_cam_with_lane_fill.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| Detected lane region painted    | Perspective-warped and blended with original |
 
 ### Annotate image with lane curvature and vehicle position.
-To code to display the derived lane curvature and lane position on the original frame is here. TODO.
 
-Images: TODO
+
+| <img src="./writeup_images/frame_0610/12_annotated.jpg" width="400"/>       |
+|:-------------:|
+| Overall confidence (width AND parallel AND radius)   |
+
+[Code](lane_finder.py#L545-L549)
 
 # Video Processing
 

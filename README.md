@@ -31,7 +31,7 @@ Before processing an image, we need to account for lens distortion (i.e. fisheye
 
 cv2.calibrateCamera() calculates calibration parameters given a set of 3D points in world space and their corresponding 2D locations in the image. We use a chessboard pattern photographed from several angles to generate input as follows:
 * 2D image points are detected by cv2.findChessboardCorners().
-* 3D points are generated using a regular grid on the (x,y), with z=0.
+* 3D points are generated using a regular grid on the (x,y) plane, with z=0.
 
 | <img src="./camera_cal_output/calibration1.jpg" width="400"/>        | <img src="./camera_cal_output/calibration1.jpg_undistorted.jpg" width="400"/>        | 
 |:-------------:|:-------------:|

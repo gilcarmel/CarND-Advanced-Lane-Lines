@@ -77,7 +77,7 @@ This is one of the weaker parts of my pipeline - it does the job on the project 
 Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
 
 
-| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down_with_quad.jpg" width="400"/>        | 
+| <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down_with_quad.png" width="400"/>        | 
 |:-------------:|:-------------:|
 | perspective view with source quad     | bird's eye view with destination quad |
 
@@ -129,19 +129,29 @@ The curvature radius at a particular point in a polynomial can be calculated usi
         
 To calculate the curve radius for the lane, we average the left and right curvature radius. This value is only considered valid in the case of a confident detection (see below).
 
-Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so in practice I found the curve radius to bounce around quite a bit in reaction to minor changes in the car's pitch.
+Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so it bounces around quite a bit in reaction to minor changes in the car's pitch.
 
 ### Perform a confidence check on the detection
 To determine whether we are confident in the prediction, we detected lane lines must be:
-* Roughly 3.7 meters apart (per US standards)
-* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip. See images below.
-* Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit.
+* Roughly 3.7 meters apart (per US standards). Here's a plot of the left and right lane line positions as detected over the entire video clip:
 
+| <img src="./writeup_images/clip_plots/project_video_positions.jpg" width="400"/>       |
+|:-------------:|
+| Left and right lane line positions   |
+
+* Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip:
 
 
  | <img src="./writeup_images/clip_plots/project_video_first_deg.jpg" width="400"/>        | <img src="./writeup_images/clip_plots/project_video_second_deg.jpg" width="400"/>        | 
 |:-------------:|:-------------:|
 | Linear coefficients      | Square coefficients |
+
+* Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit and reduce the noise in this signal:
+
+
+| <img src="./writeup_images/clip_plots/project_video_curvatures.jpg" width="400"/>       |
+|:-------------:|
+| Left and right lane line curvature   |
 
 
 Here's a plot of the confidence determination for each of these factors over the course of the video clip:

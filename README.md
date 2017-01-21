@@ -21,15 +21,14 @@ There are two distinct layers of processing: a lane-finding pipeline for single 
 
 The single image processing pipeline can be summarized as follows:
 
-* Compute the camera calibration matrix and distortion coefficients given a set of chessboard images.
+* Compute the camera calibration parameters.
 * Undistort raw image.
-* Detect lane separator "candidate pixels" using gradients and color transforms on the source image.
-* Apply a perspective transform to generate a bird's-eye view of the candidate pixels.
-* Find the left and right lane separator lines in the bird's-eye view and fit a polynomial to each
-* Perform a confidence check on the detection
+* Detect lane separator "candidate pixels".
+* Generate a bird's-eye view of the candidate pixels.
+* Find the left and right lane separator lines in the bird's-eye view
 * Determine the curvature of the lane and vehicle position with respect to center.
-* Warp the detected lane boundaries back onto the original image.
-* Output visual display of the lane boundaries and numerical estimation of lane curvature and vehicle position.
+* Perform a confidence check on the detection
+* Annotate original image with lane boundaries and other info
 
 The source code can be found in lane_finder.py TODO
 Here is the top-level function that drives the pipeline. TODO
@@ -87,9 +86,10 @@ Code is here TODO
 ### Find the left and right lane lines
 
 Now we search for the left and right lane lines. The algorithm is as follows:
+* Generate a histogram along x axis for the bottom of the image
 * For each lane line (left and right):
   * Divide the image into ten horizontal bands. From the bottom, for each band:
-    * Create search window centered horizontally above the the previous band's point
+    * Create search window centered horizontally above the the previous band's detection (or histogram peak for the bottom band)
     * Calculate the center of mass of white pixels in the search window
     * Add the center of mass to the list of points
   TODO: image
@@ -143,9 +143,27 @@ To code to display the derived lane curvature and lane position on the original 
 
 # Video Processing
 
-####1. Provide a link to your final video output.  Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!).
+Video processing uses information from the previous frames to smooth predictions and optimize the single-image pipeline:
+* For each frame:
+   * Run the single-frame detection. If a recent frame provided a confident detection, run an optimized version using the previous detection as additional input. The optimization is simple - skip the full histogram search during lane line detection, and center the bottom band's search window around the lane positions from the previous detection.
+   * Average the confident predictions over the last 10 frames to generate curve radius and lane position
+   * I also wanted to average the lane line positions, so the lane region appears smoother o
+   
+I also generate some plots to show various metrics over the length of the video:
+Left/right lane line curvature:
+Left/right lane line polynomial linear coefficient
+Left/right lane line polynomial square coefficient
+Left/right lane line positions
+Which frames did not have a recent confident prediction and performed a full histogram search
+Inverse curve radius
+Confident parallel
+Confident radius
+Confident lane width
+Confident overall
 
-Here's a [link to my video result](./project_video.mp4)
+Code is here: TODO
+
+Here's a [link to my video result](./project_video_out.mp4) TODO
 
 ---
 

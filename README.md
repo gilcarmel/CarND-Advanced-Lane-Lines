@@ -111,7 +111,7 @@ In order to convert pixel measurements into meters we need to calculate a conver
 
     # meters per pixel in y dimension (9.14m is the distance between dashes on a lane line)
     ym_per_pix = 9.14 / 230 
-    # meteres per pixel in x dimension (3.7m is the width of a lane)
+    # meters per pixel in x dimension (3.7m is the width of a lane)
     xm_per_pix = 3.7 / 640  
 
 The vehicle's position in the lane is determined by comparing the left and right lane line positions to the center of the image:
@@ -160,12 +160,18 @@ Here's a plot of the confidence determination for each of these factors over the
 ### Warp back onto the original image.
 We filled the region between the left and right lane lines, and warp it back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
 
-Images: TODO
+ | <img src="./writeup_images/frame_0610/11_lane_fill_region.jpg" width="400"/>        | <img src="./writeup_images/frame_0610/12_front_cam_with_lane_fill.jpg" width="400"/>        | 
+|:-------------:|:-------------:|
+| Detected lane region painted    | Perspective-warped and blended with original |
 
 ### Annotate image with lane curvature and vehicle position.
-To code to display the derived lane curvature and lane position on the original frame is here. TODO.
 
-Images: TODO
+
+| <img src="./writeup_images/frame_0610/12_annotated.jpg" width="400"/>       |
+|:-------------:|
+| Overall confidence (width AND parallel AND radius)   |
+
+[Code](lane_finder.py#L545-L549)
 
 # Video Processing
 

@@ -31,6 +31,7 @@ LANE_LINE_POLYS = '10_lane_line_polynomials'
 LANE_FILL = '11_lane_fill_region'
 # undistorted front camera with lane-fill overlay
 FRONT_CAM_WITH_LANE_FILL = '12_front_cam_with_lane_fill'
+ANNOTATED_IMAGE = '12_annotated'
 
 # KEYS into paramter dictionaries
 SOBEL_X_KERNEL_SIZE = 'SOBEL_X_KERNEL_SIZE'
@@ -409,7 +410,12 @@ def process_image(original, previous_lane = None):
     image_dict[FRONT_CAM_WITH_LANE_FILL] = fill_lane_region(
         image_dict[UNDISTORTED],
         image_dict[LANE_FILL])
-    return Lane(left_line, right_line, previous_lane is None), image_dict
+    image_dict[ANNOTATED_IMAGE] = np.copy(image_dict[FRONT_CAM_WITH_LANE_FILL])
+
+    lane = Lane(left_line, right_line, original.shape[1], previous_lane is None)
+    annotate_image(image_dict[ANNOTATED_IMAGE], lane.curvature_radius, lane.center_offset)
+
+    return lane, image_dict
 
 
 def create_lane_lines(original):
@@ -511,5 +517,13 @@ def to_bgr_if_necessary(img):
     return img
 
 
+def annotate_image(img, curvature_radius, center_lane_offset):
+    radius = "{:.0f}".format(curvature_radius) if curvature_radius is not None else "?"
+    cv2.putText(img, "radius = {} m".format(radius), (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0))
+    offset = "{:.2f}".format(center_lane_offset) if center_lane_offset is not None else "?"
+    cv2.putText(img, "offset = {}m".format(offset), (20, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0))
+
 # determine camera calibration parameters
 camera_matrix, distortion_coeffs = calibrate_camera()
+
+

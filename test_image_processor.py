@@ -3,6 +3,7 @@ import glob
 import itertools
 
 import cv2
+import numpy
 
 import lane_finder as lf
 
@@ -116,6 +117,7 @@ if __name__ == "__main__":
             display_image(lf.LANE_LINE_POLYS, intermediate_images[lf.LANE_LINE_POLYS])
             display_image(lf.LANE_FILL, intermediate_images[lf.LANE_FILL])
             display_image(lf.FRONT_CAM_WITH_LANE_FILL, intermediate_images[lf.FRONT_CAM_WITH_LANE_FILL])
+            display_image(lf.ANNOTATED_IMAGE, intermediate_images[lf.ANNOTATED_IMAGE])
 
         key = cv2.waitKey(33)
         if key == ord('q'):

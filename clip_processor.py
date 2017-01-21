@@ -38,8 +38,13 @@ def generate_output_frame(img):
         last_confident_image_dict = image_dict
         final_image = image_dict[lane_finder.FRONT_CAM_WITH_LANE_FILL]
     else:
-        # Todo: project last confident lane detection onto image
-        final_image = image_dict[lane_finder.UNDISTORTED]
+        if last_confident_image_dict is not None:
+            last_lane_fill = last_confident_image_dict[lane_finder.LANE_FILL]
+            final_image = lane_finder.fill_lane_region(
+                image_dict[lane_finder.UNDISTORTED],
+                last_lane_fill)
+        else:
+            final_image = image_dict[lane_finder.UNDISTORTED]
     if frame_number % 10 == 0:
         lane_finder.write_output("{0}/frame_{1:0>4}".format(basename, frame_number), img, image_dict)
         bgr_final_image = lane_finder.to_bgr_if_necessary(final_image)

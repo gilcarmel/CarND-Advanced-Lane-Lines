@@ -2,7 +2,7 @@
 [//]: # (Image References)
 
 [chessboard]
-[chessboard
+[undistorted_chessboard]
 [image1]: ./examples/undistort_output.png "Undistorted"
 [image2]: ./test_images/test1.jpg "Road Transformed"
 [image3]: ./examples/binary_combo_example.jpg "Binary Example"
@@ -30,10 +30,9 @@ The single image processing pipeline can be summarized as follows:
 * Perform a confidence check on the detection
 * Annotate original image with lane boundaries and other info
 
-The source code can be found in lane_finder.py TODO
-Here is the top-level function that drives the pipeline. TODO
+The source code can be found in [lane_finder.py](./lane_finder.py); [Here is the main function](lane_finder.py#L378-L428).
 
-I was inspired by TODO to create an interactive UI for tweaking the various parameters contained in this pipeline. Here is a short video demonstrating its use. TODO
+I was inspired by TODO to create an interactive UI for tweaking the various parameters contained in this pipeline. Here is a short video demonstrating its use. 
 
 ---
 Each step is described in detail below.
@@ -49,14 +48,16 @@ cv2.calibrateCamera() calculates calibration parameters given a set of 3D points
 [chessboard] Distorted image with corners detected
 [undistorted_chessboard] Undistorted image
 
-The code can be found [here TODO](.)
+[Code](./lane_finder.py#L460-L524)
 
 ### Undistort raw image
-We use cv2.undistort() to undistort the input image using the calibration parameters we calculated.
+We use cv2.undistort() to undistort the input image using the calibration parameters we calculated:
+
+    cv2.undistort(img, cam_matrix, distortion_coefficients, None, cam_matrix)
 
 Here's the original image and the undistorted image. TODO
 
-Code: TODO
+[Code](./lane_finder.py#L89-L97)
 
 ### Detect lane separator "candidate pixels"
 We generate a binary image with pixels that are good bets to be part of the lane separator painted white: TODO image
@@ -68,9 +69,9 @@ A threshold on the S channel of the HLS color space
 
 Each of these identified some pixels that other components missed, so combining them together yeilded a better detection of candidate pixels. 
 
-Code is here TODO
-
 This is one of the weaker parts of my pipeline - it does the job on the project video but does not perform well on the challenge videos.
+
+[Code](./lane_finder.py#L392-L396)
 
 ### Generate a bird's-eye view
 
@@ -81,7 +82,7 @@ Destination image with 4 points
 
 The source points are hard coded into the pipeline based on a measurement of one "vanilla" frame of the video. Unfortunately I found that the locations of the source source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the top-down view, which reduces our confidence in the detection: TODO
 
-Code is here TODO
+[Code](./lane_finder.py#L152-L199)
 
 ### Find the left and right lane lines
 
@@ -95,6 +96,8 @@ Now we search for the left and right lane lines. The algorithm is as follows:
   TODO: image
   * Fit a second degree polynomial to all the detected points
   TODO: image
+
+[Code](./lane_finder.py#L202-L289)
 
 ### Determine the curvature and vehicle position
 In order to convert pixel measurements into meters we need to calculate a conversion, by dividing known distances by manually measured pixel distances in the top-down view:
@@ -119,7 +122,7 @@ The curvature radius at a particular point in a polynomial can be calculated usi
         
 To calculate the curve radius for the lane, we average the left and right curvature radius. This value is only considered valid in the case of a confident detection (see below).
 
-Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so in practice I found the curve radius to bounce around quite a bit in reaction to minor movements in the car.
+Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so in practice I found the curve radius to bounce around quite a bit in reaction to minor changes in the car's pitch.
 
 ### Perform a confidence check on the detection
 To determine whether we are confident in the prediction, we detected lane lines must be:
@@ -128,18 +131,20 @@ To determine whether we are confident in the prediction, we detected lane lines 
 * Roughly the same curvature radius 
 
 Sample images TODO
-Code is here TODO
 
 Note: I determined reasonable thresholds for what is considered "parallel" by eyeballing a plot of the left and right polynomial coefficients over the lenght of an entire video clip: TODO
+
+[Code](./lane.py#L75-L100)
 
 ### Warp back onto the original image.
 We filled the region between the left and right lane lines, and warp it back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
 
-Code is here TODO
+Images: TODO
 
 ### Annotate image with lane curvature and vehicle position.
 To code to display the derived lane curvature and lane position on the original frame is here. TODO.
 
+Images: TODO
 
 # Video Processing
 
@@ -148,8 +153,10 @@ Video processing uses information from the previous frames to smooth predictions
    * Run the single-frame detection. If a recent frame provided a confident detection, run an optimized version using the previous detection as additional input. The optimization is simple - skip the full histogram search during lane line detection, and center the bottom band's search window around the lane positions from the previous detection.
    * Average the confident predictions over the last 10 frames to generate curve radius and lane position
    * I also wanted to average the lane line positions, so the lane region appears smoother o
-   
-I also generate some plots to show various metrics over the length of the video:
+
+Code [clip_processor.py](./clip_processor.py); [per-frame code](./clip_processor.py#L78-L102)
+
+The video processor also generates some plots to show various metrics over the length of the video:
 Left/right lane line curvature:
 Left/right lane line polynomial linear coefficient
 Left/right lane line polynomial square coefficient
@@ -160,8 +167,6 @@ Confident parallel
 Confident radius
 Confident lane width
 Confident overall
-
-Code is here: TODO
 
 Here's a [link to my video result](./project_video_out.mp4) TODO
 

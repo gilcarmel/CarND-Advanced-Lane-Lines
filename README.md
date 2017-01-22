@@ -17,7 +17,10 @@ The single image processing pipeline can be summarized as follows:
 
 The source code can be found in [lane_finder.py](./lane_finder.py); [Here is the main function](lane_finder.py#L378-L428).
 
-I was inspired by TODO to create an interactive UI for tweaking the various parameters contained in this pipeline. Here is a short video demonstrating its use. 
+I was inspired by another Udacity student, [Patrick Esser](https://github.com/pesser/line_finder_explorer) to create an interactive UI for tweaking the pipeline's various parameters. Here is a short video demonstrating its use:
+
+[![LANE FINDING UI](https://img.youtube.com/vi/jhyh4UwfNMc/0.jpg)](https://youtu.be/jhyh4UwfNMc)
+
 
 ---
 Each step is described in detail below.

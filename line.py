@@ -33,7 +33,7 @@ class Line:
         # set to true when lane_points are set.
         self.is_detected = False
 
-    def set_lane_points(self, lane_points):
+    def set_lane_points(self, lane_points, search_windows):
         """
         Sets the detected points on the lane line and calculates derived values,
         such as polygon fit and curvature, based on that.
@@ -41,6 +41,7 @@ class Line:
         :return:
         """
         self.lane_points = lane_points
+        self.search_windows = search_windows
         # If points were found, calculate derived values
         if len(self.lane_points) > 0:
             self.min_y = np.min(self.lane_points[:, 1])

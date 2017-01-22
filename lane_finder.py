@@ -212,8 +212,8 @@ def find_lane_lines_in_bands(img, left_line, right_line, prev_left_x=None, prev_
     """
     num_bands = 10
     search_window_half_width_ratio = 0.05
-    left_line.set_lane_points(search_climbing_bands(img, prev_left_x, num_bands, search_window_half_width_ratio))
-    right_line.set_lane_points(search_climbing_bands(img, prev_right_x, num_bands, search_window_half_width_ratio))
+    left_line.set_lane_points(*search_climbing_bands(img, prev_left_x, num_bands, search_window_half_width_ratio))
+    right_line.set_lane_points(*search_climbing_bands(img, prev_right_x, num_bands, search_window_half_width_ratio))
 
 
 def plot_histogram_to_array(histogram):
@@ -245,33 +245,35 @@ def search_climbing_bands(img, start_x, num_bands, search_window_half_width_rati
     :param num_bands: number of bands
     :param search_window_half_width_ratio: width of the search area
       (as a ratio of img width)
-    :return:  list of (x,y) tuples representing the lane-line prediction for
-      each band
+    :return:  (detected lane-line points, search windows)
     """
     height = int(img.shape[0])
     width = int(img.shape[1])
     band_height = int(float(height) / num_bands)
-    cur_bottom = height - 1
+    search_bottom = height - 1
     points = []  # Points detected
     search_window_half_width = int(search_window_half_width_ratio * width)
+    search_windows = []
     for _ in np.arange(0, num_bands):
         # Create a search window above the previous band and centered horizontally
         # about the previous detection
-        search_left_start = max(0, start_x - search_window_half_width)
-        search_left_end = min(width - 1, start_x + search_window_half_width)
+        search_left = max(0, start_x - search_window_half_width)
+        search_right = min(width - 1, start_x + search_window_half_width)
+        search_top = max(0, search_bottom - band_height)
         search_window = img[
-                        max(0, cur_bottom - band_height): cur_bottom,
-                        int(search_left_start):int(search_left_end)
+                        search_top: search_bottom,
+                        int(search_left):int(search_right)
                         ]
+        search_windows.append((search_left, search_right, search_top, search_bottom))
         # Find the center of mass within the search window and add it to the line
         center_of_mass_in_window = ndimage.measurements.center_of_mass(search_window)[::-1]
         # Empty iamges return nan for center of mass - ignore
         if not np.math.isnan(center_of_mass_in_window[0] + center_of_mass_in_window[1]):
-            start_x = search_left_start + center_of_mass_in_window[0]
-            center_of_mass_y = cur_bottom - band_height + center_of_mass_in_window[1]
+            start_x = search_left + center_of_mass_in_window[0]
+            center_of_mass_y = search_bottom - band_height + center_of_mass_in_window[1]
             points.append([start_x, center_of_mass_y])
-        cur_bottom = max(0, cur_bottom - band_height)
-    return np.array(points)
+        search_bottom = search_top
+    return np.array(points), search_windows
 
 
 def find_histogram(img):
@@ -301,8 +303,12 @@ def draw_lane_line_points(img, left_line, right_line):
     img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     for left in left_line.lane_points:
         cv2.circle(img, (int(left[0]), int(left[1])), 5, (255, 0, 0), -1)
+    for search_window in np.int32(left_line.search_windows):
+        cv2.rectangle(img, (search_window[0], search_window[2]), (search_window[1],search_window[3]), (200,65,139), 3)
     for right in right_line.lane_points:
         cv2.circle(img, (int(right[0]), int(right[1])), 5, (0, 0, 255), -1)
+    for search_window in np.int32(right_line.search_windows):
+        cv2.rectangle(img, (search_window[0], search_window[2]), (search_window[1],search_window[3]), (200,65,139), 3)
     return img
 
 

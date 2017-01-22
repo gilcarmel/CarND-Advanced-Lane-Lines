@@ -57,7 +57,8 @@ def display_image(window_name, img, *param_keys):
     """
     cv2.namedWindow(window_name, cv2.WINDOW_AUTOSIZE)
     img = lf.to_bgr_if_necessary(img)
-    cv2.imshow(window_name, img)
+    dst = cv2.resize(img, None, fx=0.5, fy=0.5, interpolation=cv2.INTER_CUBIC)
+    cv2.imshow(window_name, dst)
 
     # Create a slider for each parameter
     for param_key in param_keys:
@@ -97,12 +98,12 @@ if __name__ == "__main__":
         if not intermediate_images:
             lane, intermediate_images = lf.process_image(image)
             lf.write_output(filename, image, intermediate_images)
-            display_image("Original", image)
-            # display_image("Undistorted", output[UNDISTORTED])
+            # display_image("Original", image)
+            display_image("Undistorted", intermediate_images[lf.UNDISTORTED])
             # display_image("HLS", intermediate_images[lf.HLS])
-            display_image("S", intermediate_images[lf.S])
-            display_image("L", intermediate_images[lf.L])
-            display_image("H", intermediate_images[lf.H])
+            # display_image("S", intermediate_images[lf.S])
+            # display_image("L", intermediate_images[lf.L])
+            # display_image("H", intermediate_images[lf.H])
             display_image(lf.SOBEL_X, intermediate_images[lf.SOBEL_X], lf.SOBEL_X_KERNEL_SIZE, lf.SOBEL_X_MIN, lf.SOBEL_X_MAX)
             display_image(lf.S_THRESH, intermediate_images[lf.S_THRESH], lf.S_MIN, lf.S_MAX)
             combined_with_warp_src = add_warp_src_indicators(intermediate_images[lf.COMBINED_BINARY])
@@ -117,7 +118,7 @@ if __name__ == "__main__":
             # display_image(lf.BOTTOM_HALF_HIST, intermediate_images[lf.BOTTOM_HALF_HIST])
             # display_image(lf.LANE_LINE_POINTS, intermediate_images[lf.LANE_LINE_POINTS])
             display_image(lf.LANE_LINE_POLYS, intermediate_images[lf.LANE_LINE_POLYS])
-            # display_image(lf.LANE_FILL, intermediate_images[lf.LANE_FILL])
+            display_image(lf.LANE_FILL, intermediate_images[lf.LANE_FILL])
             # display_image(lf.FRONT_CAM_WITH_LANE_FILL, intermediate_images[lf.FRONT_CAM_WITH_LANE_FILL])
             display_image(lf.ANNOTATED_IMAGE, intermediate_images[lf.ANNOTATED_IMAGE])
 

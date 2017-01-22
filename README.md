@@ -123,7 +123,7 @@ In order to convert pixel measurements into meters we need to calculate a conver
     # meters per pixel in x dimension (3.7m is the width of a lane)
     xm_per_pix = 3.7 / 640  
 
-The vehicle's position in the lane is determined by comparing the left and right lane line positions to the center of the image:
+The vehicle's position in the lane is determined by comparing the lane's vs the image's horizontal center:
 
     def calculate_center_offset(self, image_width):
         pixel_offset = (self.right_line.x_pixels + self.left_line.x_pixels - image_width) / 2
@@ -136,9 +136,13 @@ The curvature radius at a particular point in a polynomial can be calculated usi
                    polynomial[1]) ** 2) ** 1.5) \
                 / np.absolute(2 * polynomial[0])
         
-To calculate the curve radius for the lane, we average the left and right curvature radius. This value is only considered valid in the case of a confident detection (see below).
+To calculate the curve radius for the lane, we average the left and right curvature radius. This value is only considered valid in the case of a confident detection (see below). If the left and right curvatures are above a threshold, we consider it a straightaway with infinite radius.
 
-Note that the curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so it bounces around quite a bit in reaction to minor changes in the car's pitch.
+The curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so it bounces around quite a bit in reaction to minor changes in the car's pitch. Here is the inverse of the curve radius over the course of the video. Notice the sporadic incorrect "straitaway" determinations near the end, and the constant fluctuations throughtout:
+
+| <img src="./writeup_images/clip_plots/project_video_inv_curve_radius.jpg" width="400"/>       |
+|:-------------:|
+| 1 / lane curve radius   |
 
 ### Perform a confidence check on the detection
 To determine whether we are confident in the prediction, we detected lane lines must be:

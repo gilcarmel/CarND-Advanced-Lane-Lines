@@ -7,7 +7,8 @@ This project uses computer vision techniques to detect lane information from a c
 
 There are two distinct layers of processing: a lane-finding pipeline for single images, and a video layer that leverages temporal coherence (i.e. detections from previous frames) to smooth the output and optimize the performance of the single image layer. 
 
-# Single Image Processing
+# Single Image Processing 
+### ([Source code](./lane_finder.py); [Main function](lane_finder.py#L384-L434).)
 
 The single image processing pipeline can be summarized as follows:
 
@@ -16,8 +17,6 @@ The single image processing pipeline can be summarized as follows:
 | 1. Undistort raw image.     | 2. Detect lane separator "candidate pixels". | Generate a bird's-eye view of the candidate pixels. |
 | <img src="./writeup_images/frame_0610/10_lane_line_polynomials.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/12_annotated.jpg" width="250"/>        |  
 | 4. Fit lane separator lines   | 5. Annotate original image with lane properties |
-
-The source code can be found in [lane_finder.py](./lane_finder.py); [Here is the main function](lane_finder.py#L378-L428).
 
 I was inspired by another Udacity student, [Patrick Esser](https://github.com/pesser/line_finder_explorer) to create an interactive UI for tweaking the pipeline's various parameters. Here is a short video demonstrating its use:
 
@@ -28,7 +27,7 @@ I was inspired by another Udacity student, [Patrick Esser](https://github.com/pe
 Each step is described in detail below.
 
 ### Prerequisite: Camera Calibration
-
+#### [source code](./lane_finder.py#L466-L530)
 Before processing images, we need to account for lens distortion (i.e. fisheye effect) introduced by the camera. OpenCV includes utilities for determining a camera's calibration parameters, which quantify how the camera distorts images. Since all the images are from the same camera, we only do this once.
 
 cv2.calibrateCamera() calculates calibration parameters given a set of 3D points in world space and their corresponding 2D locations in the image. We use a chessboard pattern photographed from several angles to generate input as follows:
@@ -41,9 +40,11 @@ cv2.calibrateCamera() calculates calibration parameters given a set of 3D points
 
 
 
-[Code](./lane_finder.py#L460-L524)
+
 
 ### Undistort raw image
+#### [source code](./lane_finder.py#L89-L97)
+
 We use cv2.undistort() to undistort the input image using the calibration parameters we calculated:
 
     cv2.undistort(img, cam_matrix, distortion_coefficients, None, cam_matrix)
@@ -52,9 +53,10 @@ We use cv2.undistort() to undistort the input image using the calibration parame
 |:-------------:|:-------------:|
 | Original      | Undistorted |
 
-[Code](./lane_finder.py#L89-L97)
 
 ### Detect lane separator "candidate pixels"
+#### [source code](./lane_finder.py#L399-L402)
+
 We generate a binary image, turning on pixels that are good bets to be part of the lane separator lines.
 
 
@@ -74,10 +76,8 @@ Each of these identified some pixels that other components missed, so combining 
 
 This is one of the weaker parts of my pipeline - it does the job on the project video but does not perform well on the challenge videos.
 
-[Code](./lane_finder.py#L392-L396)
-
 ### Generate a bird's-eye view
-
+#### [source code] (./lane_finder.py#L152-L199)
 Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
 
 
@@ -93,9 +93,8 @@ The source quadrilateral is hard coded based on a measurement of a typical frame
 |:-------------:|
 | Skewed lane lines caused by a bad perspective warp   |
 
-[Code](./lane_finder.py#L152-L199)
-
 ### Find the left and right lane lines
+[source code](./lane_finder.py#L202-L291)
 
 Now we search for the left and right lane lines. The algorithm is as follows:
 * Generate a histogram along x axis for the bottom of the image. The peaks of the histogram determine the starting x position for searching for lane lines starting at the bottom of the image.
@@ -119,8 +118,6 @@ Now we search for the left and right lane lines. The algorithm is as follows:
 | <img src="./writeup_images/frame_0610/10_lane_line_polynomials.jpg" width="400"/>       |
 |:-------------:|
 | Second degree polynomials fitted to detected points    |
-
-[Code](./lane_finder.py#L202-L289)
 
 ### Determine the curvature and vehicle position
 In order to convert pixel measurements into meters we need to calculate a conversion, by dividing known distances by manually measured pixel distances in the top-down view:
@@ -152,6 +149,7 @@ The curvature radius calculation is extremely sensitive to the correctness of th
 | 1 / lane curve radius   |
 
 ### Perform a confidence check on the detection
+#### [source code ](./lane.py#L75-L100)
 For a detection to be considered confident, its lane lines must be:
 * Roughly 3.7 meters apart (per US standards). Here's a plot of the left and right lane line positions and confidence over the entire video clip:
 
@@ -178,8 +176,6 @@ For a detection to be considered confident, its lane lines must be:
 |:-------------:|
 | Overall confidence (width AND parallel AND radius)   |
 
-[Code](./lane.py#L75-L100)
-
 ### Warp back onto the original image.
 After filling the region between the left and right lane lines, it gets warped back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
 
@@ -188,23 +184,21 @@ After filling the region between the left and right lane lines, it gets warped b
 | Detected lane region painted    | Perspective-warped and blended with original |
 
 ### Annotate image with lane curvature and vehicle position.
-
+#### [source code](lane_finder.py#L551-L555)
 
 | <img src="./writeup_images/frame_0610/12_annotated.jpg" width="400"/>       |
 |:-------------:|
 | Final annotated image  |
 
-[Code](lane_finder.py#L545-L549)
+
 
 # Video Processing
-
+#### [source code](./clip_processor.py); [per-frame code](./clip_processor.py#L78-L102)
 Video processing uses information from the previous frames to smooth predictions and optimize the single-image pipeline:
 * For each frame:
    * Run the single-frame detection. If a recent frame provided a confident detection, run an optimized version using the previous detection as additional input. The optimization is simple - skip the full histogram search during lane line detection, and center the bottom band's search window around the lane positions from the previous detection.
    * Average the confident predictions over the last 10 frames to generate curve radius and lane position
    * I also wanted to average the lane line positions, so the lane region changes more fluidly between frames in the output video, but I ran out of time!
-
-Code [clip_processor.py](./clip_processor.py); [per-frame code](./clip_processor.py#L78-L102)
 
 Here's my video result: [![Vidoe result](https://img.youtube.com/vi/GQAFV02Kiuk/0.jpg)](https://youtu.be/GQAFV02Kiuk)
 

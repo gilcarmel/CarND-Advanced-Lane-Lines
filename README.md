@@ -56,12 +56,12 @@ This image is obtained by ORing together three separate images:
 
 | <img src="./writeup_images/frame_0610/05_sobel_x.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/05_sobel_x_s.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/03_s_thresh.jpg" width="250"/> 
 |:-------------:|:-------------:|:-------------:|
-| A thresholded Sobel filter in the X direction on the grayscale image      | A thresholded Sobel filter in the X direction on the S channel of the HLS color space | A threshold on the S channel of the HLS color space |
+| A thresholded Sobel filter in the X direction on the grayscale image      | A thresholded Sobel filter in the X direction on the S channel of HLS color space | A threshold on the S channel of HLS color space |
 
 
 | <img src="./writeup_images/frame_0610/06_combined_binary.jpg" width="400"/>        |
 |:-------------:|
-| 3 images combined with OR      |
+| Three images combined with OR      |
 
 Each of these identified some pixels that other components missed, so combining them together yeilded a better detection of candidate pixels. 
 

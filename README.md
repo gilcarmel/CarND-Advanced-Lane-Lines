@@ -9,14 +9,11 @@ There are two distinct layers of processing: a lane-finding pipeline for single 
 
 The single image processing pipeline can be summarized as follows:
 
-* Compute the camera calibration parameters.
-* Undistort raw image.
-* Detect lane separator "candidate pixels".
-* Generate a bird's-eye view of the candidate pixels.
-* Find the left and right lane separator lines in the bird's-eye view
-* Determine the curvature of the lane and vehicle position with respect to center.
-* Perform a confidence check on the detection
-* Annotate original image with lane boundaries and other info
+| <img src="./writeup_images/frame_0610/00_undistorted.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/06_combined_binary.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/07_top_down.jpg" width="250"/> 
+|:-------------:|:-------------:|:-------------:|
+| 1. Undistort raw image.     | 2. Detect lane separator "candidate pixels". | Generate a bird's-eye view of the candidate pixels. |
+| <img src="./writeup_images/frame_0610/10_lane_line_polynomials.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/12_annotated.jpg" width="250"/>        |  
+| 4. Fit lane separator lines   | 5. Annotate original image with lane properties |
 
 The source code can be found in [lane_finder.py](./lane_finder.py); [Here is the main function](lane_finder.py#L378-L428).
 
@@ -25,9 +22,9 @@ I was inspired by TODO to create an interactive UI for tweaking the various para
 ---
 Each step is described in detail below.
 
-###Camera Calibration
+### Prerequisite: Camera Calibration
 
-Before processing an image, we need to account for lens distortion (i.e. fisheye effect from the camera). OpenCV includes utilities for determining a camera's calibration parameters, which quantify how the camera distorts images. Since all the images are taken with the same camera, we only need to do this once.
+Before processing images, we need to account for lens distortion (i.e. fisheye effect) introduced by the camera. OpenCV includes utilities for determining a camera's calibration parameters, which quantify how the camera distorts images. Since all the images are taken with the same camera, we only need to do this once.
 
 cv2.calibrateCamera() calculates calibration parameters given a set of 3D points in world space and their corresponding 2D locations in the image. We use a chessboard pattern photographed from several angles to generate input as follows:
 * 2D image points are detected by cv2.findChessboardCorners().

@@ -1,5 +1,7 @@
 
-**Advanced Lane Finding Project**
+# Advanced Lane Finding Project 
+
+![OUTPUT](/writeup_images/Lane_detection_output.gif)
 
 This project uses computer vision techniques to detect lane information from a car's front-facing camera. From an input video clip, it produces an output video marked and annotated with lane info. I completed this project as part of Udacity's Self-Driving Car nanodegree program.
 
@@ -204,7 +206,7 @@ Video processing uses information from the previous frames to smooth predictions
 
 Code [clip_processor.py](./clip_processor.py); [per-frame code](./clip_processor.py#L78-L102)
 
-Here's a [link to my video result](./project_video_out.mp4) TODO
+Here's my video result: [![Vidoe result](https://img.youtube.com/vi/GQAFV02Kiuk/0.jpg)](https://youtu.be/GQAFV02Kiuk)
 
 ---
 

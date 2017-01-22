@@ -143,7 +143,7 @@ The curvature radius at a particular point in a polynomial can be calculated usi
         
 To calculate the curve radius for the lane, we average the left and right curvature radius. This value is only considered valid in the case of a confident detection (see below). If the left and right curvatures are above a threshold, we consider it a straightaway with infinite radius.
 
-The curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so it bounces around quite a bit in reaction to minor changes in the car's pitch. Here is the inverse of the curve radius over the course of the video. Notice the sporadic incorrect "straitaway" determinations near the end, and the constant fluctuations throughtout:
+The curvature radius calculation is extremely sensitive to the correctness of the perspective warp, so it bounces around quite a bit in reaction to minor changes in the car's pitch. Here is the inverse of the curve radius over the course of the video. Notice the sporadic incorrect "straightaway" determinations near the end, and the constant fluctuations throughtout:
 
 | <img src="./writeup_images/clip_plots/project_video_inv_curve_radius.jpg" width="400"/>       |
 |:-------------:|

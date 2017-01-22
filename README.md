@@ -27,7 +27,7 @@ Each step is described in detail below.
 
 ### Prerequisite: Camera Calibration
 
-Before processing images, we need to account for lens distortion (i.e. fisheye effect) introduced by the camera. OpenCV includes utilities for determining a camera's calibration parameters, which quantify how the camera distorts images. Since all the images are taken with the same camera, we only need to do this once.
+Before processing images, we need to account for lens distortion (i.e. fisheye effect) introduced by the camera. OpenCV includes utilities for determining a camera's calibration parameters, which quantify how the camera distorts images. Since all the images are from the same camera, we only do this once.
 
 cv2.calibrateCamera() calculates calibration parameters given a set of 3D points in world space and their corresponding 2D locations in the image. We use a chessboard pattern photographed from several angles to generate input as follows:
 * 2D image points are detected by cv2.findChessboardCorners().
@@ -53,7 +53,12 @@ We use cv2.undistort() to undistort the input image using the calibration parame
 [Code](./lane_finder.py#L89-L97)
 
 ### Detect lane separator "candidate pixels"
-We generate a binary image with pixels that are good bets to be part of the lane separator painted white.
+We generate a binary image, turning on pixels that are good bets to be part of the lane separator lines.
+
+
+| <img src="./writeup_images/frame_0610/06_combined_binary.jpg" width="400"/>        |
+|:-------------:|
+| Candidate pixels are on      |
 
 This image is obtained by ORing together three separate images:
 
@@ -62,9 +67,6 @@ This image is obtained by ORing together three separate images:
 | A thresholded Sobel filter in the X direction on the grayscale image      | A thresholded Sobel filter in the X direction on the S channel of HLS color space | A threshold on the S channel of HLS color space |
 
 
-| <img src="./writeup_images/frame_0610/06_combined_binary.jpg" width="400"/>        |
-|:-------------:|
-| Three images combined with OR      |
 
 Each of these identified some pixels that other components missed, so combining them together yeilded a better detection of candidate pixels. 
 
@@ -82,7 +84,7 @@ Now we perform a perspective warp on the image from the previous step, to bring 
 | perspective view with source quad     | bird's eye view with destination quad |
 
 
-The source quadrilateral's points are hard coded into the pipeline based on a measurement of one "vanilla" frame of the video. Unfortunately the location of the source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the bird's eye view, which reduces our confidence in the detection: 
+The source quadrilateral is hard coded based on a measurement of a typical frame from the video. Unfortunately the location of the source quad is extremely sensitive to small changes in the car's attitute (i.e. small bounces pointing the camera up or down). An incorrect source quad will cause the lane lines to appear skewed in the bird's eye view, which reduces our confidence in the detection: 
 
 
 | <img src="./writeup_images/bad_warp.png" width="400"/>       |
@@ -98,7 +100,7 @@ Now we search for the left and right lane lines. The algorithm is as follows:
 
 | <img src="./writeup_images/frame_0610/08_bottom_half_hist.jpg" width="400"/>       |
 |:-------------:|
-| Histogram of white pixels in each column of the bottom half of the image    |
+| Histogram of pixel values in each column of the bottom half of the image    |
 
 * For each lane line (left and right):
   * Divide the image into ten horizontal bands. From the bottom, for each band:
@@ -126,7 +128,7 @@ In order to convert pixel measurements into meters we need to calculate a conver
     # meters per pixel in x dimension (3.7m is the width of a lane)
     xm_per_pix = 3.7 / 640  
 
-The vehicle's position in the lane is determined by comparing the lane's vs the image's horizontal center:
+The vehicle's position in the lane is determined by comparing the lane's horizontal center to that of the image:
 
     def calculate_center_offset(self, image_width):
         pixel_offset = (self.right_line.x_pixels + self.left_line.x_pixels - image_width) / 2
@@ -148,33 +150,26 @@ The curvature radius calculation is extremely sensitive to the correctness of th
 | 1 / lane curve radius   |
 
 ### Perform a confidence check on the detection
-To determine whether we are confident in the prediction, we detected lane lines must be:
-* Roughly 3.7 meters apart (per US standards). Here's a plot of the left and right lane line positions as detected over the entire video clip:
+For a detection to be considered confident, its lane lines must be:
+* Roughly 3.7 meters apart (per US standards). Here's a plot of the left and right lane line positions and confidence over the entire video clip:
 
-| <img src="./writeup_images/clip_plots/project_video_positions.jpg" width="400"/>       |
-|:-------------:|
-| Left and right lane line positions   |
+| <img src="./writeup_images/clip_plots/project_video_positions.jpg" width="400"/>       |  <img src="./writeup_images/clip_plots/project_video_is_confident_width.jpg" width="400"/>      |
+|:-------------:|:-------------:|
+| Left and right lane line positions   | Binary confidence decision based on lane width
 
 * Roughly parallel (2nd and 1st order polynomial coefficients are within a threshold). I determined reasonable thresholds by eyeballing a plot of the left and right polynomial coefficients over the length of an entire video clip:
 
 
- | <img src="./writeup_images/clip_plots/project_video_first_deg.jpg" width="400"/>        | <img src="./writeup_images/clip_plots/project_video_second_deg.jpg" width="400"/>        | 
-|:-------------:|:-------------:|
-| Linear coefficients      | Square coefficients |
+ | <img src="./writeup_images/clip_plots/project_video_first_deg.jpg" width="300"/>        | <img src="./writeup_images/clip_plots/project_video_second_deg.jpg" width="300"/>        |   <img src="./writeup_images/clip_plots/project_video_is_confident_parallel.jpg" width="300"/>       |
+|:-------------:|:-------------:|:-------------:|
+| Linear coefficients      | Square coefficients | Binary confidence decision based on polynomical coefficients |
 
 * Roughly the same curvature radius. Since the turn radius bounces around so much, I considered radii within a factor of 2 to be roughly the same. More confidence in the perspective warp would allow us to tighten that up quite a bit and reduce the noise in this signal:
 
 
-| <img src="./writeup_images/clip_plots/project_video_curvatures.jpg" width="400"/>       |
-|:-------------:|
-| Left and right lane line curvature   |
-
-
-Here's a plot of the confidence determination for each of these factors over the course of the video clip:
-
-| <img src="./writeup_images/clip_plots/project_video_is_confident_width.jpg" width="250"/>        | <img src="./writeup_images/clip_plots/project_video_is_confident_parallel.jpg" width="250"/>        | <img src="./writeup_images/clip_plots/project_video_is_confident_radius.jpg" width="250"/> |
-|:-------------:|:-------------:|:-------------:|
-| Reasonable lane width?      | Roughly parallel? | Same curve radius? |
+| <img src="./writeup_images/clip_plots/project_video_curvatures.jpg" width="400"/>       |<img src="./writeup_images/clip_plots/project_video_is_confident_radius.jpg" width="250"/> |
+|:-------------:|:-------------:|
+| Left and right lane line curvature   | Binary confidence decision based on similar curve radius   |
 
 
 | <img src="./writeup_images/clip_plots/project_video_is_confident.jpg" width="400"/>       |

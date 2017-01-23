@@ -96,7 +96,7 @@ The source quadrilateral is hard coded based on a measurement of a typical frame
 ### Find the left and right lane lines
 [source code](./lane_finder.py#L202-L291)
 
-NExt we search for the left and right lane lines:
+Next we search for the left and right lane lines:
 * Generate a histogram along x axis for the bottom half of the image. The peaks of the histogram determine the starting x positions.
 
 | <img src="./writeup_images/frame_0610/08_bottom_half_hist.jpg" width="400"/>       |

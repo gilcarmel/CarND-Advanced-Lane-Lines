@@ -3,7 +3,7 @@
 
 ![OUTPUT](/writeup_images/Lane_detection_output.gif)
 
-This project uses computer vision techniques to detect lane information from a car's front-facing camera. From an input video clip, it produces an output video marked and annotated with lane info. I completed this project as part of Udacity's Self-Driving Car nanodegree program.
+This project uses computer vision techniques to detect lane information from a car's front-facing camera. Given a video clip, it produces an output video marked and annotated with lane info. I completed it as part of Udacity's Self-Driving Car Engineer nanodegree program.
 
 There are two distinct layers of processing: a lane-finding pipeline for single images, and a video layer that leverages temporal coherence (i.e. detections from previous frames) to smooth the output and optimize the performance of the single image layer. 
 
@@ -14,9 +14,9 @@ The single image processing pipeline can be summarized as follows:
 
 | <img src="./writeup_images/frame_0610/00_undistorted.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/06_combined_binary.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/07_top_down.jpg" width="250"/> 
 |:-------------:|:-------------:|:-------------:|
-| 1. Undistort raw image.     | 2. Detect lane separator "candidate pixels". | Generate a bird's-eye view of the candidate pixels. |
+| 1. Undistort raw image     | 2. Detect lane separator "candidate pixels" | Generate a bird's-eye view |
 | <img src="./writeup_images/frame_0610/10_lane_line_polynomials.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/12_annotated.jpg" width="250"/>        |  
-| 4. Fit lane separator lines   | 5. Annotate original image with lane properties |
+| 4. Fit lane separator lines   | 5. Calculate lane properties and annotate original image |
 
 I was inspired by another Udacity student, [Patrick Esser](https://github.com/pesser/line_finder_explorer) to create an interactive UI for tweaking the pipeline's various parameters. Here is a short video demonstrating its use:
 
@@ -28,7 +28,7 @@ Each step is described in detail below.
 
 ### Prerequisite: Camera Calibration
 #### [source code](./lane_finder.py#L466-L530)
-Before processing images, we need to account for lens distortion (i.e. fisheye effect) introduced by the camera. OpenCV includes utilities for determining a camera's calibration parameters, which quantify how the camera distorts images. Since all the images are from the same camera, we only do this once.
+Before processing images, we need to account for lens distortion introduced by the camera. OpenCV includes utilities for determining a camera's calibration parameters, which quantify the distortion effect. Since all the images are from the same camera, we only do this once.
 
 cv2.calibrateCamera() calculates calibration parameters given a set of 3D points in world space and their corresponding 2D locations in the image. We use a chessboard pattern photographed from several angles to generate input as follows:
 * 2D image points are detected by cv2.findChessboardCorners().
@@ -64,7 +64,7 @@ We generate a binary image, turning on pixels that are good bets to be part of t
 |:-------------:|
 | Candidate pixels are on      |
 
-This image is obtained by ORing together three separate images:
+This image is obtained by combining three images using a binary OR:
 
 | <img src="./writeup_images/frame_0610/05_sobel_x.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/05_sobel_x_s.jpg" width="250"/>        | <img src="./writeup_images/frame_0610/03_s_thresh.jpg" width="250"/> 
 |:-------------:|:-------------:|:-------------:|
@@ -78,7 +78,7 @@ This is one of the weaker parts of my pipeline - it does the job on the project 
 
 ### Generate a bird's-eye view
 #### [source code] (./lane_finder.py#L152-L199)
-Now we perform a perspective warp on the image from the previous step, to bring it into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate such a transformation given a quadrilateral on the source image and its desired location on the destination image:
+Now we perform a perspective warp to bring the binary image into a bird's eye view that can be used to find the lane lines. OpenCV's cv2.getPerspectiveTransform() can generate this transformation given a quadrilateral designating a plane on the source image and its desired location on the destination image:
 
 
 | <img src="./writeup_images/frame_0610/source_warp.png" width="400"/>        | <img src="./writeup_images/frame_0610/07_top_down_with_quad.png" width="400"/>        | 
@@ -96,8 +96,8 @@ The source quadrilateral is hard coded based on a measurement of a typical frame
 ### Find the left and right lane lines
 [source code](./lane_finder.py#L202-L291)
 
-Now we search for the left and right lane lines. The algorithm is as follows:
-* Generate a histogram along x axis for the bottom of the image. The peaks of the histogram determine the starting x position for searching for lane lines starting at the bottom of the image.
+NExt we search for the left and right lane lines:
+* Generate a histogram along x axis for the bottom half of the image. The peaks of the histogram determine the starting x positions.
 
 | <img src="./writeup_images/frame_0610/08_bottom_half_hist.jpg" width="400"/>       |
 |:-------------:|
@@ -107,7 +107,7 @@ Now we search for the left and right lane lines. The algorithm is as follows:
   * Divide the image into ten horizontal bands. From the bottom, for each band:
     * Create search window centered horizontally above the the previous band's detection (or histogram peak for the bottom band)
     * Calculate the center of mass of white pixels in the search window
-    * Add the center of mass to the list of points
+    * Add the center of mass to a list of points
 
 | <img src="./writeup_images/frame_0610/09_lane_line_points.jpg" width="400"/>       |
 |:-------------:|
@@ -120,7 +120,7 @@ Now we search for the left and right lane lines. The algorithm is as follows:
 | Second degree polynomials fitted to detected points    |
 
 ### Determine the curvature and vehicle position
-In order to convert pixel measurements into meters we need to calculate a conversion, by dividing known distances by manually measured pixel distances in the top-down view:
+In order to convert pixel measurements into meters we divide known distances by manually measured pixel distances in the top-down view:
 
     # meters per pixel in y dimension (9.14m is the distance between dashes on a lane line)
     ym_per_pix = 9.14 / 230 
@@ -177,7 +177,7 @@ For a detection to be considered confident, its lane lines must be:
 | Overall confidence (width AND parallel AND radius)   |
 
 ### Warp back onto the original image.
-After filling the region between the left and right lane lines, it gets warped back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
+The region between the left and right lane lines gets painted and warped back as if it is seen from the front-facing camera (again using cv2.getPerspectiveTransform() but this time with reversed source and destination quadrilaterals)
 
 | <img src="./writeup_images/frame_0610/11_lane_fill_region.jpg" width="400"/>        | <img src="./writeup_images/frame_0610/12_front_cam_with_lane_fill.jpg" width="400"/>        | 
 |:-------------:|:-------------:|
@@ -205,6 +205,8 @@ Here's my video result: [![Vidoe result](https://img.youtube.com/vi/GQAFV02Kiuk/
 ---
 
 ###Discussion
+
+It was interesting working on this project, especially after using deep learning to tackle a related problem on the [previous project](https://github.com/gilcarmel/behavioral). It's easy to see why deep learning is revolutionizing the field. While computer vision techniques are an appropriate tool for this relatively constrained task, the solution feels like a stack of heuristics chained together. Reaching a robust solution would no doubt require many more of these heuristics and could grow intractable; while a properly trained deep learning model could solve this type of problem in a relatively elegant, and possibly more perofrmant way.
 
 The main problems in my implementation (and suggestions for improvement) can be summarized as follows:
 * Filters for determining lane-line pixel candidates are not robust enough. They fail miserably on the challenge videos which introduce different lighting and road conditions. Some more experimentation is needed to help reject shadow lines, use known lane width as a clue, color balance the input image, etc. A more advanced UI for interactively tweaking algorithm parameters on a set of test images would be a huge help here.
